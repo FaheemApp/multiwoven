@@ -132,11 +132,6 @@ const SteppedForm = ({ steps }: SteppedFormType): JSX.Element => {
     handleMoveForward,
   };
 
-  // Guard against undefined stepInfo
-  if (!stepInfo) {
-    return null;
-  }
-
   return (
     <SteppedFormContext.Provider value={valuesToExpose}>
       <Box width='100%'>
