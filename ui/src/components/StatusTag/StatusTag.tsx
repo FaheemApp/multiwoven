@@ -83,16 +83,16 @@ const StatusTag = ({ status, variant = StatusTagVariants.success }: StatusTagPro
   <Tag
     colorScheme='teal'
     size='xs'
-    bgColor={theme[variant].bgColor}
+    bgColor={theme[variant]?.bgColor}
     paddingX={2}
     fontWeight={600}
-    borderColor={theme[variant].borderColor}
+    borderColor={theme[variant]?.borderColor}
     borderWidth='1px'
     borderStyle='solid'
     height='22px'
     borderRadius='4px'
   >
-    <TagLabel fontSize='small' fontWeight='semibold' color={theme[variant].textColor}>
+    <TagLabel fontSize='small' fontWeight='semibold' color={theme[variant]?.textColor}>
       {status}
     </TagLabel>
   </Tag>

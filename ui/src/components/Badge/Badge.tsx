@@ -42,10 +42,10 @@ const Badge = ({ text, variant, width = '71px' }: BadgeProps): JSX.Element => {
       h='20px'
       alignItems='center'
       alignContent='center'
-      bgColor={variant ? colors[variant].bgColor : colors.default.bgColor}
+      bgColor={variant ? colors[variant]?.bgColor : colors.default.bgColor}
       border='1px'
       borderRadius='4px'
-      borderColor={variant ? colors[variant].borderColor : colors.default.borderColor}
+      borderColor={variant ? colors[variant]?.borderColor : colors.default.borderColor}
       gap='10px'
       px='2px'
       display='flex'
@@ -53,7 +53,7 @@ const Badge = ({ text, variant, width = '71px' }: BadgeProps): JSX.Element => {
       <Text
         size='xxs'
         fontWeight='semibold'
-        color={variant ? colors[variant].textColor : colors.default.textColor}
+        color={variant ? colors[variant]?.textColor : colors.default.textColor}
       >
         {text}
       </Text>
