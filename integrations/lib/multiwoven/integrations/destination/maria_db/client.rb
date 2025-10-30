@@ -6,10 +6,12 @@ module Multiwoven::Integrations::Destination
     class Client < DestinationConnector
       def check_connection(connection_config)
         connection_config = connection_config.with_indifferent_access
-        create_connection(connection_config)
+        db = create_connection(connection_config)
         ConnectionStatus.new(status: ConnectionStatusType["succeeded"]).to_multiwoven_message
       rescue StandardError => e
         ConnectionStatus.new(status: ConnectionStatusType["failed"], message: e.message).to_multiwoven_message
+      ensure
+        db&.disconnect
       end
 
       def discover(connection_config)
@@ -33,6 +35,8 @@ module Multiwoven::Integrations::Destination
           "error",
           e
         )
+      ensure
+        db&.disconnect
       end
 
       def write(sync_config, records, action = "destination_insert")
@@ -71,6 +75,8 @@ module Multiwoven::Integrations::Destination
                            sync_id: sync_config.sync_id,
                            sync_run_id: sync_config.sync_run_id
                          })
+      ensure
+        db&.disconnect
       end
 
       private
@@ -82,7 +88,9 @@ module Multiwoven::Integrations::Destination
           port: connection_config[:port],
           user: connection_config[:username],
           password: connection_config[:password],
-          database: connection_config[:database]
+          database: connection_config[:database],
+          max_connections: 2,
+          pool_timeout: 10
         )
       end
 
