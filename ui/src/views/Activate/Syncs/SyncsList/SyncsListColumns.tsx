@@ -69,6 +69,30 @@ export const SyncsListColumns: ColumnDef<CreateSyncResponse>[] = [
     },
   },
   {
+    accessorKey: 'attributes.schedule_type',
+    header: () => <h1>Schedule Type</h1>,
+    cell: (info) => {
+      const scheduleType = info.getValue() as string;
+      const attributes = info.row.original.attributes;
+      const syncInterval = attributes.sync_interval;
+      const syncIntervalUnit = attributes.sync_interval_unit;
+
+      const formattedType = scheduleType
+        ? scheduleType.charAt(0).toUpperCase() + scheduleType.slice(1)
+        : '';
+
+      const displayText = scheduleType === 'interval' && syncInterval && syncIntervalUnit
+        ? `${formattedType} (${syncInterval} ${syncIntervalUnit})`
+        : formattedType;
+
+      return (
+        <Text size='sm' fontWeight='medium'>
+          {displayText}
+        </Text>
+      );
+    },
+  },
+  {
     accessorKey: 'id',
     header: () => <h1>Actions</h1>,
     cell: (info) => {
