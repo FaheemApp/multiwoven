@@ -52,44 +52,44 @@ module Multiwoven::Integrations::Source
       private
 
       def close_connection(db)
-        Rails.logger.error("[MYSQL_CONNECTION] no db enter")
+        Multiwoven::Integrations::Service.logger.error("[MYSQL_CONNECTION] no db enter")
         return unless db
 
         connection_id = db.thread_id rescue "unknown"
 
         begin
-          Rails.logger.info("[MYSQL_CONNECTION] Attempting to close connection (thread_id: #{connection_id})")
+          Multiwoven::Integrations::Service.logger.info("[MYSQL_CONNECTION] Attempting to close connection (thread_id: #{connection_id})")
 
           # Check if connection is alive
           is_alive = db.ping rescue false
-          Rails.logger.info("[MYSQL_CONNECTION] Connection alive before close: #{is_alive}")
+          Multiwoven::Integrations::Service.logger.info("[MYSQL_CONNECTION] Connection alive before close: #{is_alive}")
 
           # Send QUIT command to MySQL server
           if is_alive
             db.query("QUIT")
-            Rails.logger.info("[MYSQL_CONNECTION] QUIT command sent successfully (thread_id: #{connection_id})")
+            Multiwoven::Integrations::Service.logger.info("[MYSQL_CONNECTION] QUIT command sent successfully (thread_id: #{connection_id})")
           end
         rescue StandardError => e
-          Rails.logger.warn("[MYSQL_CONNECTION] Error during QUIT command (thread_id: #{connection_id}): #{e.message}")
+          Multiwoven::Integrations::Service.logger.warn("[MYSQL_CONNECTION] Error during QUIT command (thread_id: #{connection_id}): #{e.message}")
         ensure
           # Force close the connection
           unless db.closed?
             db.close
-            Rails.logger.info("[MYSQL_CONNECTION] Connection closed successfully (thread_id: #{connection_id})")
+            Multiwoven::Integrations::Service.logger.info("[MYSQL_CONNECTION] Connection closed successfully (thread_id: #{connection_id})")
           else
-            Rails.logger.info("[MYSQL_CONNECTION] Connection already closed (thread_id: #{connection_id})")
+            Multiwoven::Integrations::Service.logger.info("[MYSQL_CONNECTION] Connection already closed (thread_id: #{connection_id})")
           end
 
           # Verify connection is actually closed
           begin
             still_alive = db.ping
             if still_alive
-              Rails.logger.error("[MYSQL_CONNECTION] WARNING: Connection still alive after close! (thread_id: #{connection_id})")
+              Multiwoven::Integrations::Service.logger.error("[MYSQL_CONNECTION] WARNING: Connection still alive after close! (thread_id: #{connection_id})")
             else
-              Rails.logger.info("[MYSQL_CONNECTION] Verified connection is dead (thread_id: #{connection_id})")
+              Multiwoven::Integrations::Service.logger.info("[MYSQL_CONNECTION] Verified connection is dead (thread_id: #{connection_id})")
             end
           rescue StandardError
-            Rails.logger.info("[MYSQL_CONNECTION] Verified connection is dead (thread_id: #{connection_id})")
+            Multiwoven::Integrations::Service.logger.info("[MYSQL_CONNECTION] Verified connection is dead (thread_id: #{connection_id})")
           end
         end
       end
