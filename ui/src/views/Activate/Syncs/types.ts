@@ -184,7 +184,8 @@ export type SyncRunsColumnFields =
   | 'duration'
   | 'rows_queried'
   | 'skipped_rows'
-  | 'results';
+  | 'results'
+  | 'error';
 
 export type SyncRunsColumnEntity = {
   key: SyncRunsColumnFields;

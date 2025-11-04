@@ -1,7 +1,7 @@
-import { SyncRunsResponse } from '../types';
+import { SyncRunsResponse, ErrorResponse } from '../types';
 import { ColumnDef } from '@tanstack/react-table';
 import moment from 'moment';
-import { Text, Box } from '@chakra-ui/react';
+import { Text, Box, Tooltip } from '@chakra-ui/react';
 import TypeTag from '@/components/TypeTag';
 import { FiCheckCircle, FiRefreshCw } from 'react-icons/fi';
 import StatusTag from '@/components/StatusTag';
@@ -58,6 +58,25 @@ const ResultsCell = ({ value }: { value: SyncRunsResponse['attributes'] }) => {
   );
 };
 
+const ErrorCell = ({ value }: { value: ErrorResponse | null }) => {
+  if (!value || !value.errors || value.errors.length === 0) {
+    return <Text fontSize='sm' color='gray.500'>-</Text>;
+  }
+
+  const errorMessage = value.errors.map((err) => err.detail).join(', ');
+  const truncatedMessage = errorMessage.length > 50
+    ? `${errorMessage.substring(0, 50)}...`
+    : errorMessage;
+
+  return (
+    <Tooltip label={errorMessage} fontSize='xs' placement='top' hasArrow>
+      <Text fontSize='sm' color='error.500' cursor='pointer' noOfLines={1}>
+        {truncatedMessage}
+      </Text>
+    </Tooltip>
+  );
+};
+
 export const SyncRunsColumns: ColumnDef<SyncRunsResponse>[] = [
   {
     accessorKey: 'attributes.status',
@@ -93,5 +112,10 @@ export const SyncRunsColumns: ColumnDef<SyncRunsResponse>[] = [
     accessorKey: 'attributes',
     header: () => <span>Results</span>,
     cell: (info) => <ResultsCell value={info.getValue() as SyncRunsResponse['attributes']} />,
+  },
+  {
+    accessorKey: 'attributes.error',
+    header: () => <span>Error</span>,
+    cell: (info) => <ErrorCell value={info.getValue() as ErrorResponse | null} />,
   },
 ];
