@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "mysql2"
+
 module Multiwoven::Integrations::Source
   module MariaDB
     include Multiwoven::Integrations::Core
@@ -11,7 +13,7 @@ module Multiwoven::Integrations::Source
       rescue StandardError => e
         ConnectionStatus.new(status: ConnectionStatusType["failed"], message: e.message).to_multiwoven_message
       ensure
-        db&.disconnect
+        db&.close
       end
 
       def discover(connection_config)
@@ -27,7 +29,7 @@ module Multiwoven::Integrations::Source
                            type: "error"
                          })
       ensure
-        db&.disconnect
+        db&.close
       end
 
       def read(sync_config)
@@ -44,26 +46,27 @@ module Multiwoven::Integrations::Source
                            sync_run_id: sync_config.sync_run_id
                          })
       ensure
-        db&.disconnect
+        db&.close
       end
 
       private
 
       def create_connection(connection_config)
-        Sequel.connect(
-          adapter: "mysql2",
+        Mysql2::Client.new(
           host: connection_config[:host],
           port: connection_config[:port],
-          user: connection_config[:username],
+          username: connection_config[:username],
           password: connection_config[:password],
-          database: connection_config[:database],
-          max_connections: 10,
-          pool_timeout: 10
+          database: connection_config[:database]
         )
       end
 
       def query_execution(db, query)
-        db.fetch(query).all
+        results = []
+        db.query(query, symbolize_keys: true).each do |row|
+          results << row
+        end
+        results
       end
 
       def create_streams(records)
@@ -73,11 +76,9 @@ module Multiwoven::Integrations::Source
       end
 
       def query(db, query)
-        records = []
         query_execution(db, query).map do |row|
-          records << RecordMessage.new(data: row, emitted_at: Time.now.to_i).to_multiwoven_message
+          RecordMessage.new(data: row, emitted_at: Time.now.to_i).to_multiwoven_message
         end
-        records
       end
 
       def group_by_table(records)
