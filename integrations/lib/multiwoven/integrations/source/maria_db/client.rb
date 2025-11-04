@@ -52,19 +52,25 @@ module Multiwoven::Integrations::Source
       private
 
       def create_connection(connection_config)
-        Mysql2::Client.new(
+        client = Mysql2::Client.new(
           host: connection_config[:host],
           port: connection_config[:port],
           username: connection_config[:username],
           password: connection_config[:password],
           database: connection_config[:database],
-          encoding: "utf8mb4"
+          encoding: "utf8mb4",
+          init_command: "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
         )
+        client
       end
 
       def query_execution(db, query)
         results = []
-        db.query(query, symbolize_keys: true).each do |row|
+        db.query(query, symbolize_keys: true, as: :hash, cast_booleans: true).each do |row|
+          # Ensure all string values are properly encoded as UTF-8
+          row = row.transform_values do |value|
+            value.is_a?(String) ? value.force_encoding(Encoding::UTF_8) : value
+          end
           results << row
         end
         results
