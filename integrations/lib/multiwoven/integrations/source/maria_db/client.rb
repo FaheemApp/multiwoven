@@ -13,7 +13,10 @@ module Multiwoven::Integrations::Source
       rescue StandardError => e
         ConnectionStatus.new(status: ConnectionStatusType["failed"], message: e.message).to_multiwoven_message
       ensure
-        db&.close
+        if db
+          db.close
+          db = nil
+        end
       end
 
       def discover(connection_config)
@@ -29,7 +32,10 @@ module Multiwoven::Integrations::Source
                            type: "error"
                          })
       ensure
-        db&.close
+        if db
+          db.close
+          db = nil
+        end
       end
 
       def read(sync_config)
@@ -46,7 +52,10 @@ module Multiwoven::Integrations::Source
                            sync_run_id: sync_config.sync_run_id
                          })
       ensure
-        db&.close
+        if db
+          db.close
+          db = nil
+        end
       end
 
       private

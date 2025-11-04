@@ -11,7 +11,10 @@ module Multiwoven::Integrations::Destination
       rescue StandardError => e
         ConnectionStatus.new(status: ConnectionStatusType["failed"], message: e.message).to_multiwoven_message
       ensure
-        db&.disconnect
+        if db
+          db.disconnect
+          db = nil
+        end
       end
 
       def discover(connection_config)
@@ -36,7 +39,10 @@ module Multiwoven::Integrations::Destination
           e
         )
       ensure
-        db&.disconnect
+        if db
+          db.disconnect
+          db = nil
+        end
       end
 
       def write(sync_config, records, action = "destination_insert")
@@ -76,7 +82,10 @@ module Multiwoven::Integrations::Destination
                            sync_run_id: sync_config.sync_run_id
                          })
       ensure
-        db&.disconnect
+        if db
+          db.disconnect
+          db = nil
+        end
       end
 
       private
