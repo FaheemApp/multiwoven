@@ -5,6 +5,7 @@ require "mysql2"
 module Multiwoven::Integrations::Source
   module MariaDB
     include Multiwoven::Integrations::Core
+    Multiwoven::Integrations::Service.logger.error("[MYSQL_CONNECTION] MariaDB::Client file loaded")
     class Client < SourceConnector
       def check_connection(connection_config)
         connection_config = connection_config.with_indifferent_access
