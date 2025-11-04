@@ -146,6 +146,7 @@ export type SyncColumnEntity = {
 };
 
 export type FinalizeSyncFormFields = {
+  name?: string;
   description?: string;
   sync_mode: 'full_refresh';
   sync_interval: number;

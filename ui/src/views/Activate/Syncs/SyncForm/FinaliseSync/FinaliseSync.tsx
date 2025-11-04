@@ -33,6 +33,7 @@ const FinaliseSync = (): JSX.Element => {
 
   const formik = useFormik({
     initialValues: {
+      name: '',
       description: '',
       sync_mode: 'full_refresh',
       sync_interval: 0,
@@ -85,6 +86,28 @@ const FinaliseSync = (): JSX.Element => {
             <Text fontWeight='600' mb='6' size='md'>
               Finalise setting for this sync
             </Text>
+
+            <Box display='flex' alignItems='center' marginBottom='8px'>
+              <Text size='sm' fontWeight='semibold'>
+                Name
+              </Text>
+              <Text size='xs' color='gray.600' ml={1} fontWeight={400}>
+                (Optional)
+              </Text>
+            </Box>
+
+            <Input
+              name='name'
+              value={formik.values.name}
+              placeholder='Enter a name for this sync'
+              background='gray.100'
+              mb='6'
+              onChange={formik.handleChange}
+              borderWidth='1px'
+              borderStyle='solid'
+              borderColor='gray.400'
+            />
+
             <Box display='flex' alignItems='center' marginBottom='8px'>
               <Text size='sm' fontWeight='semibold'>
                 Description
