@@ -3,7 +3,7 @@ import TopBar from '@/components/TopBar';
 import { fetchSyncs } from '@/services/syncs';
 import { Box } from '@chakra-ui/react';
 import { useQuery } from '@tanstack/react-query';
-import { FiPlus } from 'react-icons/fi';
+import { FiPlus, FiRefreshCw } from 'react-icons/fi';
 import { SYNCS_LIST_QUERY_KEY } from '../constants';
 
 import Loader from '@/components/Loader';
@@ -14,13 +14,14 @@ import DataTable from '@/components/DataTable';
 import { SyncsListColumns } from './SyncsListColumns';
 import { Row } from '@tanstack/react-table';
 import { useNavigate } from 'react-router-dom';
+import BaseButton from '@/components/BaseButton';
 
 const SyncsList = (): JSX.Element => {
   const navigate = useNavigate();
 
   const activeWorkspaceId = useStore((state) => state.workspaceId);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: [...SYNCS_LIST_QUERY_KEY, activeWorkspaceId],
     queryFn: () => fetchSyncs(),
     refetchOnMount: true,
@@ -29,6 +30,10 @@ const SyncsList = (): JSX.Element => {
   });
 
   const syncList = data?.data;
+
+  const handleRefresh = () => {
+    refetch();
+  };
 
   const handleOnSyncClick = (row: Row<CreateSyncResponse>) => {
     navigate(`${row.original.id}`);
@@ -57,6 +62,18 @@ const SyncsList = (): JSX.Element => {
           ctaColor='gray.900'
           ctaHoverBgColor='orange.400'
           isCtaVisible
+          extra={
+            <Box mr={3}>
+              <BaseButton
+                variant='shell'
+                leftIcon={<FiRefreshCw color='black.500' />}
+                text='Refresh'
+                color='black.500'
+                onClick={handleRefresh}
+                isLoading={isFetching}
+              />
+            </Box>
+          }
         />
         <Box border='1px' borderColor='gray.400' borderRadius={'lg'} overflowX='scroll'>
           <DataTable columns={SyncsListColumns} data={syncList} onRowClick={handleOnSyncClick} />

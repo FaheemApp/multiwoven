@@ -6,6 +6,7 @@ import { Text } from '@chakra-ui/react';
 import dayjs from 'dayjs';
 import EntityItem from '@/components/EntityItem';
 import { useStore } from '@/stores';
+import SyncActionButton from './SyncActionButton';
 
 export const SyncsListColumns: ColumnDef<CreateSyncResponse>[] = [
   {
@@ -65,6 +66,15 @@ export const SyncsListColumns: ColumnDef<CreateSyncResponse>[] = [
           variant={status !== 'disabled' ? StatusTagVariants.success : StatusTagVariants.paused}
         />
       );
+    },
+  },
+  {
+    accessorKey: 'id',
+    header: () => <h1>Actions</h1>,
+    cell: (info) => {
+      const syncId = info.getValue() as string;
+      const scheduleType = info.row.original.attributes.schedule_type;
+      return <SyncActionButton syncId={syncId} scheduleType={scheduleType} />;
     },
   },
 ];
