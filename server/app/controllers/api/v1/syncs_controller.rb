@@ -146,6 +146,7 @@ module Api
                                       :cron_expression,
                                       :stream_name,
                                       :cursor_field,
+                                      :name,
                                       configuration: [
                                         :from,
                                         :to,
