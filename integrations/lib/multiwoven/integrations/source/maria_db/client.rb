@@ -57,38 +57,38 @@ module Multiwoven::Integrations::Source
         connection_id = db.thread_id rescue "unknown"
 
         begin
-          Rails.logger.info.info("[MYSQL_CONNECTION] Attempting to close connection (thread_id: #{connection_id})")
+          Rails.logger.info("[MYSQL_CONNECTION] Attempting to close connection (thread_id: #{connection_id})")
 
           # Check if connection is alive
           is_alive = db.ping rescue false
-          Rails.logger.info.info("[MYSQL_CONNECTION] Connection alive before close: #{is_alive}")
+          Rails.logger.info("[MYSQL_CONNECTION] Connection alive before close: #{is_alive}")
 
           # Send QUIT command to MySQL server
           if is_alive
             db.query("QUIT")
-            Rails.logger.info.info("[MYSQL_CONNECTION] QUIT command sent successfully (thread_id: #{connection_id})")
+            Rails.logger.info("[MYSQL_CONNECTION] QUIT command sent successfully (thread_id: #{connection_id})")
           end
         rescue StandardError => e
-          Rails.logger.info.warn("[MYSQL_CONNECTION] Error during QUIT command (thread_id: #{connection_id}): #{e.message}")
+          Rails.logger.warn("[MYSQL_CONNECTION] Error during QUIT command (thread_id: #{connection_id}): #{e.message}")
         ensure
           # Force close the connection
           unless db.closed?
             db.close
-            Rails.logger.info.info("[MYSQL_CONNECTION] Connection closed successfully (thread_id: #{connection_id})")
+            Rails.logger.info("[MYSQL_CONNECTION] Connection closed successfully (thread_id: #{connection_id})")
           else
-            Rails.logger.info.info("[MYSQL_CONNECTION] Connection already closed (thread_id: #{connection_id})")
+            Rails.logger.info("[MYSQL_CONNECTION] Connection already closed (thread_id: #{connection_id})")
           end
 
           # Verify connection is actually closed
           begin
             still_alive = db.ping
             if still_alive
-              Rails.logger.info.error("[MYSQL_CONNECTION] WARNING: Connection still alive after close! (thread_id: #{connection_id})")
+              Rails.logger.error("[MYSQL_CONNECTION] WARNING: Connection still alive after close! (thread_id: #{connection_id})")
             else
-              Rails.logger.info.info("[MYSQL_CONNECTION] Verified connection is dead (thread_id: #{connection_id})")
+              Rails.logger.info("[MYSQL_CONNECTION] Verified connection is dead (thread_id: #{connection_id})")
             end
           rescue StandardError
-            Rails.logger.info.info("[MYSQL_CONNECTION] Verified connection is dead (thread_id: #{connection_id})")
+            Rails.logger.info("[MYSQL_CONNECTION] Verified connection is dead (thread_id: #{connection_id})")
           end
         end
       end
