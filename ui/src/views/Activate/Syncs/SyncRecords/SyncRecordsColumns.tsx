@@ -22,43 +22,57 @@ export const useDynamicSyncColumns = (data: SyncRecordResponse[]) => {
 };
 
 const ErrorMessageCell = ({ syncRecord }: { syncRecord: SyncRecordResponse['attributes'] }) => {
+  // For successful records, show nothing
+  if (syncRecord.status === SyncRecordStatus.success) {
+    return <Text fontSize='sm' color='gray.500'>-</Text>;
+  }
+
   // Extract error message from logs response
   const getErrorMessage = () => {
-    if (!syncRecord?.logs?.response) return null;
+    // Check if logs exist
+    if (!syncRecord?.logs) return null;
 
+    const response = syncRecord.logs.response;
+
+    // If no response, return null
+    if (!response || response.trim() === '') return null;
+
+    // Try to parse as JSON first
     try {
-      const response = JSON.parse(syncRecord.logs.response);
+      const parsed = JSON.parse(response);
+
       // Handle different error response formats
-      if (response.error) return response.error;
-      if (response.message) return response.message;
-      if (response.errors) {
-        if (Array.isArray(response.errors)) {
-          return response.errors.map((e: any) => e.detail || e.message || e).join(', ');
+      if (parsed.error) return String(parsed.error);
+      if (parsed.message) return String(parsed.message);
+      if (parsed.errors) {
+        if (Array.isArray(parsed.errors)) {
+          return parsed.errors.map((e: any) => e.detail || e.message || String(e)).join(', ');
         }
-        return response.errors;
+        return String(parsed.errors);
       }
-      // If response itself is the error message
-      if (typeof response === 'string') return response;
-      return syncRecord.logs.response;
+
+      // If parsed object has no error fields, return stringified version
+      return JSON.stringify(parsed);
     } catch {
       // If not JSON, return raw response
-      return syncRecord.logs.response;
+      return response;
     }
   };
 
   const errorMessage = getErrorMessage();
 
-  if (!errorMessage || syncRecord.status === SyncRecordStatus.success) {
+  // If no error message found, show dash
+  if (!errorMessage) {
     return <Text fontSize='sm' color='gray.500'>-</Text>;
   }
 
-  const truncatedMessage = errorMessage.length > 50
-    ? `${errorMessage.substring(0, 50)}...`
+  const truncatedMessage = errorMessage.length > 100
+    ? `${errorMessage.substring(0, 100)}...`
     : errorMessage;
 
   return (
-    <Tooltip label={errorMessage} fontSize='xs' placement='top' hasArrow>
-      <Text fontSize='sm' color='error.500' cursor='pointer' noOfLines={1}>
+    <Tooltip label={errorMessage} fontSize='xs' placement='top' hasArrow maxW='500px'>
+      <Text fontSize='sm' color='error.500' cursor='pointer' noOfLines={2} maxW='300px'>
         {truncatedMessage}
       </Text>
     </Tooltip>
