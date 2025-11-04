@@ -52,6 +52,7 @@ module Multiwoven::Integrations::Source
       private
 
       def close_connection(db)
+        Rails.logger.error("[MYSQL_CONNECTION] no db enter")
         return unless db
 
         connection_id = db.thread_id rescue "unknown"
