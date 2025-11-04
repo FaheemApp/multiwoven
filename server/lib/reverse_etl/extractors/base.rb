@@ -145,6 +145,19 @@ module ReverseEtl
 
       def update_or_create_sync_record(sync_record, record, sync_run, fingerprint)
         begin
+          # Retry failed records: if record previously failed, reset to pending for retry
+          if sync_record && !sync_record.new_record? && sync_record.failed?
+            sync_record.assign_attributes(
+              sync_run_id: sync_run.id,
+              action: action(sync_record),
+              fingerprint:,
+              record: record.data,
+              status: "pending"
+            )
+            sync_record.save!
+            return true
+          end
+
           unless sync_record && new_record?(sync_record, fingerprint)
             log_skip_sync_run(sync_record, record, sync_run)
 

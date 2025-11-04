@@ -39,7 +39,11 @@ module ReverseEtl
         sync_records_to_save = build_sync_records_in_parallel(records, sync_run, model)
         return if sync_records_to_save.empty?
 
-        result = SyncRecord.insert_all(sync_records_to_save, returning: %w[primary_key]) # rubocop:disable Rails/SkipsModelValidations
+        # Use upsert_all instead of insert_all to handle failed records - this will update existing records
+        # and insert new ones, effectively retrying failed records by resetting them to pending status
+        result = SyncRecord.upsert_all(sync_records_to_save, # rubocop:disable Rails/SkipsModelValidations
+                                       unique_by: %i[sync_id primary_key],
+                                       returning: %w[primary_key])
         return if records.count == sync_records_to_save.count && sync_records_to_save.count == result.rows.size
 
         log_mismatch_error(records, sync_records_to_save, result.rows.flatten,
@@ -76,7 +80,8 @@ module ReverseEtl
           sync_run_id: sync_run.id,
           action: :destination_insert,
           fingerprint: generate_fingerprint(record_data),
-          record: record_data
+          record: record_data,
+          status: :pending
         }
       rescue StandardError => e
         # Utils::ExceptionReporter.report(e, {
