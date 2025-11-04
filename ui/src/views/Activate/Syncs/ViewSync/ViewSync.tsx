@@ -20,10 +20,15 @@ import SyncRuns from '../SyncRuns';
 import EditSync from '../EditSync';
 import useGetSyncById from '@/hooks/syncs/useGetSyncById';
 import TabsWrapper from '@/components/TabsWrapper';
+import BaseButton from '@/components/BaseButton';
+import { FiRefreshCcw } from 'react-icons/fi';
+import useManualSync from '@/hooks/syncs/useManualSync';
+import useSyncRuns from '@/hooks/syncs/useSyncRuns';
 
 import { changeSyncStatus } from '@/services/syncs';
 
 import { useAPIErrorsToast, useErrorToast } from '@/hooks/useErrorToast';
+import { APIRequestMethod } from '@/services/common';
 
 enum SyncTabs {
   Runs = 'runs',
@@ -64,6 +69,8 @@ const SyncTabContent = ({ syncTab }: { syncTab: SyncTabs }) => {
   return syncTab === SyncTabs.Runs ? <SyncRuns /> : <EditSync />;
 };
 
+const SYNC_STATUS = ['pending', 'started', 'querying', 'queued', 'in_progress'];
+
 const ViewSync = (): JSX.Element => {
   const activeWorkspaceId = useStore((state) => state.workspaceId);
   const setSelectedSync = useSyncStore((state) => state.setSelectedSync);
@@ -81,7 +88,17 @@ const ViewSync = (): JSX.Element => {
     data: syncFetchResponse,
     isLoading,
     isError,
+    refetch: refetchSync,
   } = useGetSyncById(syncId as string, activeWorkspaceId);
+
+  const { isSubmitting, runSyncNow, showCancelSync, setShowCancelSync } = useManualSync(
+    syncId as string,
+  );
+  const { data: syncRuns, refetch: refetchSyncRuns } = useSyncRuns(
+    syncId as string,
+    1,
+    activeWorkspaceId,
+  );
 
   const syncData = syncFetchResponse?.data?.attributes;
 
@@ -130,6 +147,30 @@ const ViewSync = (): JSX.Element => {
     }
   }, [syncData, setSelectedSync]);
 
+  useEffect(() => {
+    const syncList = syncRuns?.data;
+    if (syncList && syncList.length > 0) {
+      const latestSyncStatus = syncList[0]?.attributes?.status;
+      if (SYNC_STATUS.includes(latestSyncStatus)) {
+        setShowCancelSync(true);
+      } else {
+        setShowCancelSync(false);
+      }
+    }
+  }, [syncRuns, setShowCancelSync]);
+
+  const handleManualSyncTrigger = async (triggerMethod: APIRequestMethod) => {
+    await runSyncNow(triggerMethod);
+    setTimeout(() => {
+      refetchSyncRuns();
+    }, 1000);
+  };
+
+  const handleRefresh = () => {
+    refetchSync();
+    refetchSyncRuns();
+  };
+
   const EDIT_SYNC_FORM_STEPS: Step[] = [
     { name: 'Syncs', url: '/activate/syncs' },
     { name: syncData?.name || `Sync ${syncId}`, url: '' },
@@ -158,8 +199,29 @@ const ViewSync = (): JSX.Element => {
             <TabItem text='Configuration' action={() => setSyncTab(SyncTabs.Config)} />
           </TabList>
         </TabsWrapper>
-        {syncTab === SyncTabs.Config && (
-          <Box display='flex' flexDir='row' gap='12px'>
+        <Box display='flex' flexDir='row' gap='12px'>
+          {syncTab === SyncTabs.Runs && (
+            <>
+              <BaseButton
+                variant='shell'
+                leftIcon={<FiRefreshCcw color='black.500' />}
+                text='Refresh'
+                color='black.500'
+                onClick={handleRefresh}
+              />
+              {syncData?.schedule_type === 'manual' && (
+                <BaseButton
+                  variant='shell'
+                  leftIcon={<FiRefreshCcw color='black.500' />}
+                  text={showCancelSync ? 'Cancel Run' : 'Run Now'}
+                  color='black.500'
+                  onClick={() => handleManualSyncTrigger(showCancelSync ? 'delete' : 'post')}
+                  isLoading={isSubmitting}
+                />
+              )}
+            </>
+          )}
+          {syncTab === SyncTabs.Config && (
             <Box
               h='100%'
               w='fit-content'
@@ -183,8 +245,8 @@ const ViewSync = (): JSX.Element => {
                 onChange={handleSyncStatusChange}
               />
             </Box>
-          </Box>
-        )}
+          )}
+        </Box>
       </Box>
       <Box pb={1}>
         <SyncTabContent syncTab={syncTab} />
