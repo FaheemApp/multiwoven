@@ -45,12 +45,18 @@ module ReverseEtl
             #                                   sync_run_id: sync_run.id,
             #                                   sync_id: sync.id
             #                                 })
+            error_logs = {
+              level: "error",
+              message: e.message,
+              stack_trace: Rails.backtrace_cleaner.clean(e.backtrace)
+            }
             Rails.logger.error({
               error_message: e.message,
               sync_run_id: sync_run.id,
               sync_id: sync_run.sync_id,
-              stack_trace: Rails.backtrace_cleaner.clean(e.backtrace)
+              stack_trace: error_logs[:stack_trace]
             }.to_s)
+            sync_record.update(logs: error_logs, status: "failed")
           end
 
           heartbeat(activity, sync_run)
@@ -71,16 +77,30 @@ module ReverseEtl
           transformed_records = sync_records.map { |sync_record| transformer.transform(sync, sync_record) }
           report = handle_response(client.write(sync_config, transformed_records), sync_run)
           if report.tracking.success.zero?
+            # Store error logs for failed batch records
+            batch_error_logs = get_sync_records_logs(report)
+            sync_records.each do |sync_record|
+              sync_record.update(logs: batch_error_logs, status: "failed") if batch_error_logs
+            end
             failed_sync_records.concat(sync_records.map { |record| record["id"] }.compact)
           else
             successfull_sync_records.concat(sync_records.map { |record| record["id"] }.compact)
           end
         rescue Activities::LoaderActivity::FullRefreshFailed
           raise
-        rescue StandardError
+        rescue StandardError => e
           # Utils::ExceptionReporter.report(e, {
           #                                   sync_run_id: sync_run.id
           #                                 })
+          error_logs = {
+            level: "error",
+            message: e.message,
+            stack_trace: Rails.backtrace_cleaner.clean(e.backtrace)
+          }
+          sync_records.each do |sync_record|
+            sync_record.update(logs: error_logs, status: "failed")
+          end
+          failed_sync_records.concat(sync_records.map { |record| record["id"] }.compact)
         end
         update_sync_records_status(sync_run, successfull_sync_records, failed_sync_records)
         heartbeat(activity, sync_run)

@@ -57,7 +57,8 @@ module Multiwoven::Integrations::Source
           port: connection_config[:port],
           username: connection_config[:username],
           password: connection_config[:password],
-          database: connection_config[:database]
+          database: connection_config[:database],
+          encoding: "utf8mb4"
         )
       end
 
