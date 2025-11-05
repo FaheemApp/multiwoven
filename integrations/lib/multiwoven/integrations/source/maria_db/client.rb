@@ -81,18 +81,6 @@ module Multiwoven::Integrations::Source
           else
             Multiwoven::Integrations::Service.logger.info("[MYSQL_CONNECTION] Connection already closed (thread_id: #{connection_id})")
           end
-
-          # Verify connection is actually closed
-          begin
-            still_alive = db.ping
-            if still_alive
-              Multiwoven::Integrations::Service.logger.error("[MYSQL_CONNECTION] WARNING: Connection still alive after close! (thread_id: #{connection_id})")
-            else
-              Multiwoven::Integrations::Service.logger.info("[MYSQL_CONNECTION] Verified connection is dead (thread_id: #{connection_id})")
-            end
-          rescue StandardError
-            Multiwoven::Integrations::Service.logger.info("[MYSQL_CONNECTION] Verified connection is dead (thread_id: #{connection_id})")
-          end
         end
       end
 
