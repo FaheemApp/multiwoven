@@ -64,6 +64,8 @@ services:
       dockerfile: Dockerfile
       args:
         TARGETARCH: ${TARGETARCH:-amd64}
+    volumes:
+      - ./integrations/lib:/usr/local/bundle/ruby/3.2.0/gems/multiwoven-integrations-0.34.5/lib:ro
     ports:
       - "3000:3000"
     depends_on:
@@ -84,6 +86,8 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
+    volumes:
+      - ./integrations/lib:/usr/local/bundle/ruby/3.2.0/gems/multiwoven-integrations-0.34.5/lib:ro
     depends_on:
       - db
       - redis

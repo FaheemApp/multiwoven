@@ -1,28 +1,31 @@
 # frozen_string_literal: true
 
 require "mysql2"
+require "time"
+require "fileutils"
 
 module Multiwoven::Integrations::Source
   module MariaDB
     include Multiwoven::Integrations::Core
-    Rails.logger.debug("[MYSQL_CONNECTION] MariaDB::Client file loaded")
     Multiwoven::Integrations::Service.logger.debug("[MYSQL_CONNECTION] MariaDB::Client file loaded")
     class Client < SourceConnector
       def check_connection(connection_config)
+        connection = nil
         connection_config = connection_config.with_indifferent_access
-        db = create_connection(connection_config)
+        connection = create_connection(connection_config)
         ConnectionStatus.new(status: ConnectionStatusType["succeeded"]).to_multiwoven_message
       rescue StandardError => e
         ConnectionStatus.new(status: ConnectionStatusType["failed"], message: e.message).to_multiwoven_message
       ensure
-        close_connection(db)
+        connection&.close
       end
 
       def discover(connection_config)
+        connection = nil
         connection_config = connection_config.with_indifferent_access
         query = "SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = '#{connection_config[:database]}' ORDER BY table_name, ordinal_position;"
-        db = create_connection(connection_config)
-        results = query_execution(db, query)
+        connection = create_connection(connection_config)
+        results = query_execution(connection, query)
         catalog = Catalog.new(streams: create_streams(results))
         catalog.to_multiwoven_message
       rescue StandardError => e
@@ -31,15 +34,16 @@ module Multiwoven::Integrations::Source
                            type: "error"
                          })
       ensure
-        close_connection(db)
+        connection&.close
       end
 
       def read(sync_config)
+        connection = nil
         connection_config = sync_config.source.connection_specification.with_indifferent_access
         query = sync_config.model.query
         query = batched_query(query, sync_config.limit, sync_config.offset) unless sync_config.limit.nil? && sync_config.offset.nil?
-        db = create_connection(connection_config)
-        query(db, query)
+        connection = create_connection(connection_config)
+        query(connection, query)
       rescue StandardError => e
         handle_exception(e, {
                            context: "MARIA:DB:READ:EXCEPTION",
@@ -48,17 +52,39 @@ module Multiwoven::Integrations::Source
                            sync_run_id: sync_config.sync_run_id
                          })
       ensure
-        close_connection(db)
+        connection&.close
       end
 
       private
 
       def close_connection(db)
-        return unless db
+        unless db
+          log_connection_event(:debug, "[MYSQL_CONNECTION] close_connection skipped: no client instance")
+          return
+        end
 
+        connection_id = db.thread_id rescue "unknown"
+
+        log_connection_event(:info, "[MYSQL_CONNECTION] Closing connection (thread_id: #{connection_id})")
         db.close
+        log_connection_event(:info, "[MYSQL_CONNECTION] Connection closed successfully (thread_id: #{connection_id})")
       rescue StandardError => e
-        Multiwoven::Integrations::Service.logger.warn("[MYSQL_CONNECTION] Error while closing connection: #{e.message}")
+        log_connection_event(:warn, "[MYSQL_CONNECTION] Error while closing connection: #{e.message}")
+      end
+
+      def log_connection_event(level, message)
+        Multiwoven::Integrations::Service.logger.public_send(level, message)
+        file_path = ENV.fetch("MULTIWOVEN_MARIADB_LOG_PATH", nil)
+        return if file_path.nil? || file_path.strip.empty?
+
+        begin
+          FileUtils.mkdir_p(File.dirname(file_path))
+          File.open(file_path, "a") do |file|
+            file.puts("[#{Time.now.utc.iso8601}] #{message}")
+          end
+        rescue StandardError => e
+          Multiwoven::Integrations::Service.logger.warn("[MYSQL_CONNECTION] Failed to write log file #{file_path}: #{e.message}")
+        end
       end
 
       def create_connection(connection_config)
@@ -78,9 +104,9 @@ module Multiwoven::Integrations::Source
         client
       end
 
-      def query_execution(db, query)
+      def query_execution(connection, query)
         results = []
-        db.query(query, symbolize_keys: true, as: :hash, cast_booleans: true).each do |row|
+        connection.query(query, symbolize_keys: true, as: :hash, cast_booleans: true).each do |row|
           # Ensure all string values are properly encoded as UTF-8
           row = row.transform_values do |value|
             value.is_a?(String) ? value.force_encoding(Encoding::UTF_8) : value
@@ -96,8 +122,8 @@ module Multiwoven::Integrations::Source
         end
       end
 
-      def query(db, query)
-        query_execution(db, query).map do |row|
+      def query(connection, query)
+        query_execution(connection, query).map do |row|
           RecordMessage.new(data: row, emitted_at: Time.now.to_i).to_multiwoven_message
         end
       end
