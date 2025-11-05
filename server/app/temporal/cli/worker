@@ -11,14 +11,10 @@ worker.register_workflow(Workflows::SyncWorkflow)
 worker.register_workflow(Workflows::ScheduleSyncWorkflow)
 worker.register_workflow(Workflows::TerminateWorkflow)
 
-# worker.add_workflow_task_middleware(Middlewares::DatabaseMiddleware)
-# Disabled due to sync workflow failures in staging.
-# The middleware appears to be causing connection pooling issues, resulting in errors like:
-# "There is an issue connecting with your hostname: <hostname>. Please check your database configuration and
-# ensure there is a valid connection to your database."
-# Occasionally, the fetch sync activity also fails to retrieve the sync using the provided sync ID.
-# Further investigation is needed to understand the impact of DatabaseMiddleware on
-# database connections and workflow execution.
+# Re-enabled after fixing connection.close issue in DatabaseMiddleware
+# The middleware now only calls clear_active_connections! in the ensure block
+# The with_connection block handles proper connection checkout/checkin lifecycle
+worker.add_workflow_task_middleware(Middlewares::DatabaseMiddleware)
 
 worker.register_activity(Activities::FetchSyncActivity)
 worker.register_activity(Activities::CreateSyncRunActivity)

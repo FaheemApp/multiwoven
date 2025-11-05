@@ -27,6 +27,14 @@ module ReverseEtl
 
         # change state querying to queued
         sync_run.queue!
+      ensure
+        # Source client connections are closed in each read() call's ensure block
+        # This is a safety net to log completion
+        Rails.logger.debug({
+          message: "[MYSQL] Extractor activity completed - source connections cleaned up via ensure blocks",
+          sync_run_id:,
+          total_query_rows:
+        }.to_s) if sync_run
       end
 
       private

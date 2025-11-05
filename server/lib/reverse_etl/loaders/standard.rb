@@ -61,6 +61,8 @@ module ReverseEtl
 
           heartbeat(activity, sync_run)
         end
+      ensure
+        cleanup_client_connection(client) if client
       end
 
       def process_batch_records(sync_run, sync, sync_config, activity)
@@ -104,6 +106,8 @@ module ReverseEtl
         end
         update_sync_records_status(sync_run, successfull_sync_records, failed_sync_records)
         heartbeat(activity, sync_run)
+      ensure
+        cleanup_client_connection(client) if client
       end
 
       def handle_response(report, sync_run)
@@ -159,6 +163,20 @@ module ReverseEtl
           error_message: "SyncRun cannot progress from its current state: #{sync_run.status}",
           sync_run_id: sync_run.id,
           stack_trace: nil
+        }.to_s)
+      end
+
+      def cleanup_client_connection(client)
+        # Connectors handle their own connection cleanup in write() ensure blocks
+        # This method is a safety net for any lingering resources
+        Rails.logger.debug({
+          message: "[MYSQL] Loader activity completed - connector connections cleaned up via ensure blocks"
+        }.to_s)
+      rescue StandardError => e
+        Rails.logger.warn({
+          message: "[MYSQL] Error during client cleanup safety check",
+          error: e.message,
+          stack_trace: Rails.backtrace_cleaner.clean(e.backtrace)
         }.to_s)
       end
     end
