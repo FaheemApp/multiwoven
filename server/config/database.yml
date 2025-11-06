@@ -2,6 +2,10 @@ default: &default
   adapter: postgresql
   encoding: unicode
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 100 } %>
+  # Reap connections that have been inactive for 5 seconds
+  reaping_frequency: 30
+  # Close connections that have been idle for 300 seconds (5 minutes)
+  idle_timeout: 300
 
 development:
   <<: *default
