@@ -15,7 +15,17 @@ module Utils
       end
 
       Thread.new do
+        # Ensure this thread doesn't hold onto a database connection
+        # The health check doesn't need database access
+        ActiveRecord::Base.connection_pool.release_connection if ActiveRecord::Base.connected?
+
         server.start
+      rescue StandardError => e
+        Rails.logger.error("Health check server error: #{e.message}")
+        Rails.logger.error(e.backtrace.join("\n"))
+      ensure
+        # Clean up any connections if they were somehow established
+        ActiveRecord::Base.connection_pool.release_connection if ActiveRecord::Base.connected?
       end
     end
   end
