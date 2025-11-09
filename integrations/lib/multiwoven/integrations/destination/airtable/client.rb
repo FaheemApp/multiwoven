@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "cgi"
 require_relative "schema_helper"
 module Multiwoven
   module Integrations
@@ -55,22 +56,34 @@ module Multiwoven
                              })
           end
 
-          def write(sync_config, records, _action = "create")
+          def write(sync_config, records, action = "destination_insert")
             connection_config = sync_config.destination.connection_specification.with_indifferent_access
             api_key = connection_config[:api_key]
             url = sync_config.stream.url
+            primary_key = sync_config.model.primary_key
             log_message_array = []
             write_success = 0
             write_failure = 0
+
             records.each_slice(MAX_CHUNK_SIZE) do |chunk|
-              payload = create_payload(chunk)
-              args = [sync_config.stream.request_method, url, payload]
+              # Process records based on action type
+              processed_records = process_records_for_action(chunk, action, primary_key, url, api_key)
+
+              # Skip if no records to process (all updates failed to find existing records)
+              next if processed_records.empty?
+
+              # Determine HTTP method based on action
+              http_method = action == "destination_update" ? "PATCH" : HTTP_POST
+              payload = create_payload_with_ids(processed_records)
+              args = [http_method, url, payload]
+
               response = Multiwoven::Integrations::Core::HttpClient.request(
                 url,
-                sync_config.stream.request_method,
+                http_method,
                 payload: payload,
                 headers: auth_headers(api_key)
               )
+
               if success?(response)
                 write_success += chunk.size
               else
@@ -98,6 +111,57 @@ module Multiwoven
           end
 
           private
+
+          def process_records_for_action(records, action, primary_key, url, api_key)
+            return records.map { |r| { fields: r } } if action == "destination_insert"
+
+            # For updates, find existing Airtable records
+            records.map do |record|
+              primary_key_value = record[primary_key]
+              existing_record = find_airtable_record(url, primary_key, primary_key_value, api_key)
+
+              if existing_record
+                { id: existing_record["id"], fields: record }
+              else
+                # If record doesn't exist in Airtable, treat as insert
+                { fields: record }
+              end
+            end.compact
+          end
+
+          def find_airtable_record(url, field_name, field_value, api_key)
+            # Build filterByFormula to find record by primary key
+            # Escape single quotes in the value
+            escaped_value = field_value.to_s.gsub("'", "\\'")
+            formula = "{#{field_name}}='#{escaped_value}'"
+            encoded_formula = CGI.escape(formula)
+
+            search_url = "#{url}?filterByFormula=#{encoded_formula}&maxRecords=1"
+
+            response = Multiwoven::Integrations::Core::HttpClient.request(
+              search_url,
+              HTTP_GET,
+              headers: auth_headers(api_key)
+            )
+
+            return nil unless success?(response)
+
+            body = extract_body(response)
+            records = body["records"]
+            records&.first
+          rescue StandardError => e
+            handle_exception(e, {
+                               context: "AIRTABLE:FIND:RECORD:EXCEPTION",
+                               type: "error"
+                             })
+            nil
+          end
+
+          def create_payload_with_ids(processed_records)
+            {
+              "records" => processed_records
+            }
+          end
 
           def create_payload(records)
             {
