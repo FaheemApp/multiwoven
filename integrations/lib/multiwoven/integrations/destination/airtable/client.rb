@@ -65,31 +65,58 @@ module Multiwoven
             write_success = 0
             write_failure = 0
 
+            # Bulk query: Find all existing records in ONE request (instead of N requests)
+            existing_records_map = find_existing_records_bulk(records, primary_key, url, api_key)
+
             records.each_slice(MAX_CHUNK_SIZE) do |chunk|
-              # Process records based on action type
-              processed_records = process_records_for_action(chunk, action, primary_key, url, api_key)
+              # Separate into updates and inserts based on bulk query results
+              updates = []
+              inserts = []
 
-              # Skip if no records to process (all updates failed to find existing records)
-              next if processed_records.empty?
-
-              # Determine HTTP method based on action
-              http_method = action == "destination_update" ? "PATCH" : HTTP_POST
-              payload = create_payload_with_ids(processed_records)
-              args = [http_method, url, payload]
-
-              response = Multiwoven::Integrations::Core::HttpClient.request(
-                url,
-                http_method,
-                payload: payload,
-                headers: auth_headers(api_key)
-              )
-
-              if success?(response)
-                write_success += chunk.size
-              else
-                write_failure += chunk.size
+              chunk.each do |record|
+                pk_value = record[primary_key]
+                if existing_records_map[pk_value]
+                  # Record exists in Airtable - prepare for UPDATE
+                  updates << { id: existing_records_map[pk_value], fields: record }
+                else
+                  # Record doesn't exist - prepare for INSERT
+                  inserts << { fields: record }
+                end
               end
-              log_message_array << log_request_response("info", args, response)
+
+              # Process updates with PATCH
+              if updates.any?
+                update_payload = create_payload_with_ids(updates)
+                update_response = Multiwoven::Integrations::Core::HttpClient.request(
+                  url,
+                  "PATCH",
+                  payload: update_payload,
+                  headers: auth_headers(api_key)
+                )
+                if success?(update_response)
+                  write_success += updates.size
+                else
+                  write_failure += updates.size
+                end
+                log_message_array << log_request_response("info", ["PATCH", url, update_payload], update_response)
+              end
+
+              # Process inserts with POST
+              if inserts.any?
+                insert_payload = create_payload_with_ids(inserts)
+                insert_response = Multiwoven::Integrations::Core::HttpClient.request(
+                  url,
+                  HTTP_POST,
+                  payload: insert_payload,
+                  headers: auth_headers(api_key)
+                )
+                if success?(insert_response)
+                  write_success += inserts.size
+                else
+                  write_failure += inserts.size
+                end
+                log_message_array << log_request_response("info", [HTTP_POST, url, insert_payload], insert_response)
+              end
             rescue StandardError => e
               handle_exception(e, {
                                  context: "AIRTABLE:RECORD:WRITE:EXCEPTION",
@@ -112,49 +139,50 @@ module Multiwoven
 
           private
 
-          def process_records_for_action(records, action, primary_key, url, api_key)
-            return records.map { |r| { fields: r } } if action == "destination_insert"
+          def find_existing_records_bulk(records, primary_key, url, api_key)
+            return {} if records.empty?
 
-            # For updates, find existing Airtable records
-            records.map do |record|
-              primary_key_value = record[primary_key]
-              existing_record = find_airtable_record(url, primary_key, primary_key_value, api_key)
+            # Build OR formula to find all records in a single query
+            # Example: OR({id}='1', {id}='2', {id}='3')
+            formulas = records.map do |record|
+              pk_value = record[primary_key]
+              escaped_value = pk_value.to_s.gsub("'", "\\'")
+              "{#{primary_key}}='#{escaped_value}'"
+            end
 
-              if existing_record
-                { id: existing_record["id"], fields: record }
-              else
-                # If record doesn't exist in Airtable, treat as insert
-                { fields: record }
+            # Airtable has a URL length limit, so batch queries if needed
+            # Typically safe up to ~100 records per query
+            existing_map = {}
+            formulas.each_slice(100) do |formula_batch|
+              formula = "OR(#{formula_batch.join(', ')})"
+              encoded_formula = CGI.escape(formula)
+              search_url = "#{url}?filterByFormula=#{encoded_formula}"
+
+              response = Multiwoven::Integrations::Core::HttpClient.request(
+                search_url,
+                HTTP_GET,
+                headers: auth_headers(api_key)
+              )
+
+              next unless success?(response)
+
+              body = extract_body(response)
+              airtable_records = body["records"] || []
+
+              # Build map: primary_key_value => airtable_record_id
+              airtable_records.each do |airtable_record|
+                pk_value = airtable_record.dig("fields", primary_key)
+                existing_map[pk_value] = airtable_record["id"] if pk_value
               end
-            end.compact
-          end
+            end
 
-          def find_airtable_record(url, field_name, field_value, api_key)
-            # Build filterByFormula to find record by primary key
-            # Escape single quotes in the value
-            escaped_value = field_value.to_s.gsub("'", "\\'")
-            formula = "{#{field_name}}='#{escaped_value}'"
-            encoded_formula = CGI.escape(formula)
-
-            search_url = "#{url}?filterByFormula=#{encoded_formula}&maxRecords=1"
-
-            response = Multiwoven::Integrations::Core::HttpClient.request(
-              search_url,
-              HTTP_GET,
-              headers: auth_headers(api_key)
-            )
-
-            return nil unless success?(response)
-
-            body = extract_body(response)
-            records = body["records"]
-            records&.first
+            existing_map
           rescue StandardError => e
             handle_exception(e, {
-                               context: "AIRTABLE:FIND:RECORD:EXCEPTION",
+                               context: "AIRTABLE:BULK:FIND:EXCEPTION",
                                type: "error"
                              })
-            nil
+            {} # Return empty map on error - all records will be treated as inserts
           end
 
           def create_payload_with_ids(processed_records)
