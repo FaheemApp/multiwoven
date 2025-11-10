@@ -14,6 +14,7 @@ type PrimaryKeyMappingSelectorProps = {
   stream: Stream | null;
   value: PrimaryKeyMappingType | null;
   onChange: (mapping: PrimaryKeyMappingType | null) => void;
+  isEdit?: boolean;
 };
 
 const PrimaryKeyMappingSelector = ({
@@ -22,6 +23,7 @@ const PrimaryKeyMappingSelector = ({
   stream,
   value,
   onChange,
+  isEdit = false,
 }: PrimaryKeyMappingSelectorProps): JSX.Element => {
   const [selectedSourceField, setSelectedSourceField] = useState<string>('');
   const [selectedDestinationField, setSelectedDestinationField] = useState<string>('');
@@ -59,11 +61,23 @@ const PrimaryKeyMappingSelector = ({
   }, [value?.destination, stream?.name]);
 
   useEffect(() => {
-    onChange({
-      source: selectedSourceField,
-      destination: selectedDestinationField,
-    });
-  }, [selectedSourceField, selectedDestinationField, onChange]);
+    // Don't call onChange in edit mode to prevent infinite loops
+    if (isEdit) {
+      return;
+    }
+
+    // Only call onChange if the values have actually changed from the current value prop
+    if (
+      value?.source !== selectedSourceField ||
+      value?.destination !== selectedDestinationField
+    ) {
+      onChange({
+        source: selectedSourceField,
+        destination: selectedDestinationField,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSourceField, selectedDestinationField, isEdit]);
 
   const isSelectionDisabled = !stream;
 
@@ -86,7 +100,7 @@ const PrimaryKeyMappingSelector = ({
             placeholder='Select a column'
             value={selectedSourceField}
             onChange={(event) => setSelectedSourceField(event.target.value)}
-            isDisabled={isSelectionDisabled || modelColumns.length === 0}
+            isDisabled={isEdit || isSelectionDisabled || modelColumns.length === 0}
             background='gray.100'
             borderColor='gray.400'
           >
@@ -106,7 +120,7 @@ const PrimaryKeyMappingSelector = ({
             placeholder='Select a field'
             value={selectedDestinationField}
             onChange={(event) => setSelectedDestinationField(event.target.value)}
-            isDisabled={isSelectionDisabled || destinationColumns.length === 0}
+            isDisabled={isEdit || isSelectionDisabled || destinationColumns.length === 0}
             background='gray.100'
             borderColor='gray.400'
           >

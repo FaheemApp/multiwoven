@@ -256,6 +256,7 @@ const EditSync = (): JSX.Element | null => {
                   stream={selectedStream}
                   value={primaryKeyMapping}
                   onChange={setPrimaryKeyMapping}
+                  isEdit
                 />
               )}
               {isHttpDestination && httpSyncSettings && (
