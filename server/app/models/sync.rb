@@ -49,12 +49,15 @@ class Sync < ApplicationRecord # rubocop:disable Metrics/ClassLength
   belongs_to :model
   has_many :sync_runs, dependent: :destroy
   has_many :sync_files, dependent: :destroy
+  has_many :sync_records, dependent: :destroy
 
   after_initialize :set_defaults, if: :new_record?
   after_save :schedule_sync, if: :schedule_sync?
   after_update :terminate_sync, if: :terminate_sync?
   after_discard :perform_post_discard_sync
   validate :primary_key_mapping_presence_for_airtable
+  validate :http_settings_requirements
+  before_validation :apply_http_sync_defaults
 
   default_scope -> { kept.order(updated_at: :desc) }
 
@@ -207,7 +210,34 @@ class Sync < ApplicationRecord # rubocop:disable Metrics/ClassLength
     mapping[:destination].presence || source_primary_key
   end
 
+  def http_settings
+    (http_sync_settings || {}).with_indifferent_access
+  end
+
+  def http_events_filter
+    events = Array(http_settings[:events]).map(&:to_s)
+    events.presence || default_http_events
+  end
+
+  def http_batch_size
+    value = http_settings[:batch_size].to_i
+    value.positive? ? value : default_http_batch_size
+  end
+
   private
+
+  def apply_http_sync_defaults
+    return unless destination&.connector_name&.casecmp("http")&.zero?
+
+    settings = http_settings
+    events = Array(settings[:events]).map(&:to_s).presence || default_http_events
+    settings[:events] = events
+
+    batch_size_value = settings[:batch_size].to_i
+    settings[:batch_size] = batch_size_value.positive? ? batch_size_value : default_http_batch_size
+
+    self.http_sync_settings = settings
+  end
 
   def primary_key_mapping_with_indifferent_access
     (primary_key_mapping || {}).with_indifferent_access
@@ -223,5 +253,25 @@ class Sync < ApplicationRecord # rubocop:disable Metrics/ClassLength
     if destination_primary_key.blank?
       errors.add(:primary_key_mapping, "Destination primary key is required for Airtable syncs")
     end
+  end
+
+  def http_settings_requirements
+    return unless destination&.connector_name&.casecmp("http")&.zero?
+
+    if Array(http_settings[:events]).blank?
+      errors.add(:http_sync_settings, "Select at least one HTTP event trigger")
+    end
+
+    if http_settings[:batch_size].present? && http_settings[:batch_size].to_i <= 0
+      errors.add(:http_sync_settings, "Batch size must be greater than zero")
+    end
+  end
+
+  def default_http_events
+    %w[insert update delete]
+  end
+
+  def default_http_batch_size
+    1000
   end
 end

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class SyncSerializer < ActiveModel::Serializer
-  attributes :id, :source_id, :destination_id, :model_id, :configuration, :primary_key_mapping,
+  attributes :id, :source_id, :destination_id, :model_id, :configuration, :primary_key_mapping, :http_sync_settings,
              :schedule_type, :sync_mode, :sync_interval, :sync_interval_unit, :cron_expression,
              :stream_name, :status, :cursor_field, :current_cursor_field, :name,
              :updated_at, :created_at

@@ -8,7 +8,7 @@ import SelectModel from './SelectModel';
 import SelectDestination from './SelectDestination';
 import ConfigureSyncs from './ConfigureSyncs';
 import FinaliseSync from './FinaliseSync';
-import { FieldMap as FieldMapType, PrimaryKeyMapping } from '@/views/Activate/Syncs/types';
+import { FieldMap as FieldMapType, PrimaryKeyMapping, HTTPSyncSettings } from '@/views/Activate/Syncs/types';
 import { SchemaMode } from '@/views/Activate/Syncs/types';
 
 const SyncForm = (): JSX.Element => {
@@ -18,6 +18,7 @@ const SyncForm = (): JSX.Element => {
   const [schemaMode, setSchemaMode] = useState<SchemaMode | null>(null);
   const [selectedSyncMode, setSelectedSyncMode] = useState('');
   const [cursorField, setCursorField] = useState('');
+  const [httpSyncSettings, setHttpSyncSettings] = useState<HTTPSyncSettings | null>(null);
 
   const navigate = useNavigate();
   const steps = [
@@ -46,12 +47,14 @@ const SyncForm = (): JSX.Element => {
           selectedStream={selectedStream}
           configuration={configuration}
           primaryKeyMapping={primaryKeyMapping}
+          httpSyncSettings={httpSyncSettings}
           schemaMode={schemaMode}
           cursorField={cursorField}
           selectedSyncMode={selectedSyncMode}
           setSelectedStream={setSelectedStream}
           setConfiguration={setConfiguration}
           setPrimaryKeyMapping={setPrimaryKeyMapping}
+          setHttpSyncSettings={setHttpSyncSettings}
           setSchemaMode={setSchemaMode}
           setSelectedSyncMode={setSelectedSyncMode}
           setCursorField={setCursorField}

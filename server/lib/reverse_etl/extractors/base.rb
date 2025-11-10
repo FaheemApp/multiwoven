@@ -177,6 +177,24 @@ module ReverseEtl
         log_skip_sync_run(sync_record, record, sync_run, e)
         false
       end
+
+      def enqueue_deleted_records(sync_run, current_primary_keys)
+        sync = sync_run.sync
+        return if current_primary_keys.nil?
+        return unless sync.destination.connector_name.casecmp("http").zero?
+        return unless sync.http_events_filter.include?("delete")
+
+        keys = current_primary_keys.to_a
+        records_to_delete = sync.sync_records.success.where.not(primary_key: keys)
+        records_to_delete.find_each do |record|
+          record.update!(
+            sync_run_id: sync_run.id,
+            status: :pending,
+            action: :destination_delete,
+            logs: nil
+          )
+        end
+      end
     end
     # rubocop:enable Metrics/ClassLength
   end

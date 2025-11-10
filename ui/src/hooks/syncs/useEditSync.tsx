@@ -6,6 +6,7 @@ import {
   CreateSyncPayload,
   CreateSyncResponse,
   PrimaryKeyMapping,
+  HTTPSyncSettings,
 } from '@/views/Activate/Syncs/types';
 import { CustomToastStatus } from '@/components/Toast/index';
 import useCustomToast from '@/hooks/useCustomToast';
@@ -21,6 +22,7 @@ const useEditSync = (
   modelId?: string,
   sourceId?: string,
   primaryKeyMapping?: PrimaryKeyMapping | null,
+  httpSyncSettings?: HTTPSyncSettings | null,
 ) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -46,6 +48,7 @@ const useEditSync = (
             cursor_field: cursorField,
             cron_expression: data?.cron_expression,
             primary_key_mapping: primaryKeyMapping,
+            http_sync_settings: httpSyncSettings,
           },
         };
 

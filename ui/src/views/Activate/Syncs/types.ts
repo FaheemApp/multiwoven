@@ -62,6 +62,11 @@ export type PrimaryKeyMapping = {
   destination: string;
 };
 
+export type HTTPSyncSettings = {
+  events: string[];
+  batch_size?: number;
+};
+
 export type SyncsConfigurationForTemplateMapping = {
   data: {
     configurations: {
@@ -85,6 +90,7 @@ export type ConfigSync = {
   configuration: FieldMap[];
   stream_name: string;
   primary_key_mapping?: PrimaryKeyMapping | null;
+  http_sync_settings?: HTTPSyncSettings | null;
 };
 
 export interface SyncEntity extends ConfigSync {
@@ -139,6 +145,7 @@ export type CreateSyncResponse = {
     };
     model: ModelEntity;
     primary_key_mapping?: PrimaryKeyMapping | null;
+    http_sync_settings?: HTTPSyncSettings | null;
   };
   id: string;
   type: 'syncs';

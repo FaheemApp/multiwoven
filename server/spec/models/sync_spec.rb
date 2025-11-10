@@ -523,4 +523,23 @@ RSpec.describe Sync, type: :model do
       )
     end
   end
+
+  describe "HTTP sync settings validations" do
+    let(:workspace) { create(:workspace) }
+    let(:source) { create(:connector, connector_type: "source", workspace:, connector_name: "Snowflake") }
+    let(:model) { create(:model, workspace:, connector: source, primary_key: "id") }
+    let(:destination) { create(:connector, connector_type: "destination", workspace:, connector_name: "Http") }
+    let!(:catalog) { create(:catalog, connector: destination, workspace:) }
+
+    it "is valid when events and batch size are configured" do
+      sync = build(:sync, workspace:, source:, destination:, model:, http_sync_settings: { events: %w[insert update], batch_size: 5 })
+      expect(sync).to be_valid
+    end
+
+    it "is invalid when batch size is not positive" do
+      sync = build(:sync, workspace:, source:, destination:, model:, http_sync_settings: { events: %w[insert], batch_size: 0 })
+      expect(sync).not_to be_valid
+      expect(sync.errors[:http_sync_settings]).to include("Batch size must be greater than zero")
+    end
+  end
 end

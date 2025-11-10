@@ -6,7 +6,8 @@
   "streams": [
     {
       "name": "http",
-      "batch_support": false,
+      "batch_support": true,
+      "batch_size": 100,
       "action": "create",
       "method": "POST",
       "json_schema": {},

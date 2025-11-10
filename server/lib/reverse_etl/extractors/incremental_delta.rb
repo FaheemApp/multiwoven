@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "set"
 module ReverseEtl
   module Extractors
     class IncrementalDelta < Base
@@ -20,15 +21,18 @@ module ReverseEtl
         model = sync_run.sync.model
         initial_cursor_field_value = sync_run.sync.current_cursor_field
 
+        seen_primary_keys = Set.new
+
         ReverseEtl::Utils::BatchQuery.execute_in_batches(batch_query_params) do |records,
           current_offset, last_cursor_field_value|
 
           total_query_rows += records.count
-          skipped_rows += process_records(records, sync_run, model)
+          skipped_rows += process_records(records, sync_run, model, seen_primary_keys)
           sync_run.update(current_offset:, total_query_rows:, skipped_rows:)
           sync_run.sync.update(current_cursor_field: last_cursor_field_value)
           heartbeat(activity, sync_run, initial_cursor_field_value)
         end
+        enqueue_deleted_records(sync_run, seen_primary_keys)
         # change state querying to queued
         sync_run.queue!
       ensure
@@ -45,11 +49,12 @@ module ReverseEtl
       private
 
       # TODO: refactor this method
-      def process_records(records, sync_run, model)
+      def process_records(records, sync_run, model, seen_primary_keys)
         Parallel.map(records, in_threads: THREAD_COUNT) do |message|
           record = message.record
           fingerprint = generate_fingerprint(record.data)
           sync_record = process_record(record, sync_run, model)
+          seen_primary_keys << sync_record.primary_key if sync_record&.primary_key
           update_or_create_sync_record(sync_record, record, sync_run, fingerprint) ? 0 : 1
         end.sum
       end

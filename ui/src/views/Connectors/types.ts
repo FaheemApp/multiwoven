@@ -89,6 +89,7 @@ export type ConnectorAttributes = {
 export type ConnectorItem = {
   attributes: ConnectorAttributes;
   id: string;
+  configuration?: unknown;
 };
 
 export type ConnectorInfoResponse = {

@@ -33,6 +33,10 @@ module ReverseEtl
           concurrency = sync_config.stream.request_rate_concurrency || THREAD_COUNT
 
           Parallel.each(sync_records, in_threads: concurrency) do |sync_record|
+            unless deliver_sync_record?(sync, sync_record)
+              sync_record.update(status: "success")
+              next
+            end
             transformer = Transformers::UserMapping.new
             record = transformer.transform(sync, sync_record)
             Rails.logger.info "sync_id = #{sync.id} sync_run_id = #{sync_run.id} sync_record = #{record}"
@@ -68,7 +72,7 @@ module ReverseEtl
       def process_batch_records(sync_run, sync, sync_config, activity)
         transformer = Transformers::UserMapping.new
         client = sync.destination.connector_client.new
-        batch_size = sync_config.stream.batch_size
+        batch_size = effective_batch_size(sync, sync_config.stream.batch_size)
 
         # track sync record status
         successfull_sync_records = []
@@ -76,12 +80,16 @@ module ReverseEtl
 
         Parallel.each(sync_run.sync_records.pending.find_in_batches(batch_size:),
                       in_threads: THREAD_COUNT) do |sync_records|
-          transformed_records = sync_records.map { |sync_record| transformer.transform(sync, sync_record) }
+          filtered_records = sync_records.select { |sync_record| deliver_sync_record?(sync, sync_record) }
+          (sync_records - filtered_records).each { |record| record.update(status: "success") }
+          next if filtered_records.empty?
+
+          transformed_records = filtered_records.map { |sync_record| transformer.transform(sync, sync_record) }
           report = handle_response(client.write(sync_config, transformed_records), sync_run)
           if report.tracking.success.zero?
             # Store error logs for failed batch records
             batch_error_logs = get_sync_records_logs(report)
-            sync_records.each do |sync_record|
+            filtered_records.each do |sync_record|
               sync_record.update(logs: batch_error_logs, status: "failed") if batch_error_logs
             end
             failed_sync_records.concat(sync_records.map { |record| record["id"] }.compact)
@@ -99,7 +107,7 @@ module ReverseEtl
             message: e.message,
             stack_trace: Rails.backtrace_cleaner.clean(e.backtrace)
           }
-          sync_records.each do |sync_record|
+          filtered_records.each do |sync_record|
             sync_record.update(logs: error_logs, status: "failed")
           end
           failed_sync_records.concat(sync_records.map { |record| record["id"] }.compact)
@@ -131,6 +139,9 @@ module ReverseEtl
       def update_sync_record_logs_and_status(report, sync_record)
         status = report.tracking.success.zero? ? "failed" : "success"
         sync_record.update(logs: get_sync_records_logs(report), status:)
+        if sync_record.action == "destination_delete" && status == "success"
+          sync_record.destroy
+        end
       end
 
       def get_sync_records_logs(report)
@@ -140,7 +151,9 @@ module ReverseEtl
       end
 
       def update_sync_records_status(sync_run, successfull_sync_records, failed_sync_records)
-        sync_run.sync_records.where(id: successfull_sync_records).update_all(status: "success") # rubocop:disable Rails/SkipsModelValidations
+        success_scope = sync_run.sync_records.where(id: successfull_sync_records)
+        success_scope.update_all(status: "success") # rubocop:disable Rails/SkipsModelValidations
+        success_scope.where(action: SyncRecord.actions[:destination_delete]).delete_all
         sync_run.sync_records.where(id: failed_sync_records).update_all(status: "failed") # rubocop:disable Rails/SkipsModelValidations
       end
 
@@ -178,6 +191,30 @@ module ReverseEtl
           error: e.message,
           stack_trace: Rails.backtrace_cleaner.clean(e.backtrace)
         }.to_s)
+      end
+
+      def deliver_sync_record?(sync, sync_record)
+        return true unless sync.destination.connector_name.casecmp("http").zero?
+
+        allowed_events = sync.http_events_filter
+        case sync_record.action.to_s
+        when "destination_insert"
+          allowed_events.include?("insert")
+        when "destination_update"
+          allowed_events.include?("update")
+        when "destination_delete"
+          allowed_events.include?("delete")
+        else
+          true
+        end
+      end
+
+      def effective_batch_size(sync, default_batch_size)
+        if sync.destination.connector_name.casecmp("http").zero? && sync.http_batch_size.positive?
+          sync.http_batch_size
+        else
+          default_batch_size
+        end
       end
     end
   end

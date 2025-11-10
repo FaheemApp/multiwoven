@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box, Checkbox, CheckboxGroup, Input, Stack, Text } from '@chakra-ui/react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getCatalog } from '@/services/syncs';
@@ -17,6 +17,7 @@ import {
   SchemaMode,
   Stream,
   TriggerSyncButtonProps,
+  HTTPSyncSettings,
 } from '@/views/Activate/Syncs/types';
 import ScheduleForm from './ScheduleForm';
 import { FormikProps, useFormik } from 'formik';
@@ -58,6 +59,7 @@ const EditSync = (): JSX.Element | null => {
   const [isEditLoading, setIsEditLoading] = useState<boolean>(false);
   const [configuration, setConfiguration] = useState<FieldMapType[] | null>(null);
   const [primaryKeyMapping, setPrimaryKeyMapping] = useState<PrimaryKeyMapping | null>(null);
+  const [httpSyncSettings, setHttpSyncSettings] = useState<HTTPSyncSettings | null>(null);
   const activeWorkspaceId = useStore((state) => state.workspaceId);
   const [refresh, setRefresh] = useState(false);
 
@@ -77,6 +79,10 @@ const EditSync = (): JSX.Element | null => {
   } = useGetSyncById(syncId as string, activeWorkspaceId);
 
   const syncData = syncFetchResponse?.data?.attributes;
+  const requiresPrimaryKeyMapping =
+    syncData?.destination?.connector_name?.toLowerCase() === 'airtable';
+  const isHttpDestination =
+    syncData?.destination?.connector_name?.toLowerCase() === 'http';
 
   const { data: destinationFetchResponse, isLoading: isConnectorInfoLoading } = useQuery({
     queryKey: ['sync', 'destination', syncData?.destination.id, activeWorkspaceId],
@@ -106,6 +112,7 @@ const EditSync = (): JSX.Element | null => {
       syncData?.model?.id,
       syncData?.source?.id,
       primaryKeyMapping,
+      httpSyncSettings,
     );
 
   const formik: FormikProps<FinalizeSyncFormFields> = useFormik({
@@ -184,6 +191,20 @@ const EditSync = (): JSX.Element | null => {
       }
       setSelectedSyncMode(syncData?.sync_mode ?? 'full_refresh');
       setCursorField(syncData?.cursor_field || '');
+      const destinationName = syncData?.destination?.connector_name?.toLowerCase();
+      if (destinationName === 'http') {
+        const events =
+          syncData?.http_sync_settings?.events && syncData.http_sync_settings.events.length > 0
+            ? syncData.http_sync_settings.events
+            : ['insert', 'update', 'delete'];
+        const batchSize = Number(syncData?.http_sync_settings?.batch_size) || 1000;
+        setHttpSyncSettings({
+          events,
+          batch_size: batchSize,
+        });
+      } else {
+        setHttpSyncSettings(null);
+      }
       setPrimaryKeyMapping(syncData?.primary_key_mapping ?? null);
     }
   }, [syncFetchResponse]);
@@ -228,7 +249,7 @@ const EditSync = (): JSX.Element | null => {
                 setCursorField={setCursorField}
                 streams={streams}
               />
-              {syncData?.destination?.connector_name?.toLowerCase() === 'airtable' && (
+              {requiresPrimaryKeyMapping && (
                 <PrimaryKeyMappingSelector
                   model={syncData?.model}
                   destination={destinationFetchResponse?.data}
@@ -236,6 +257,51 @@ const EditSync = (): JSX.Element | null => {
                   value={primaryKeyMapping}
                   onChange={setPrimaryKeyMapping}
                 />
+              )}
+              {isHttpDestination && httpSyncSettings && (
+                <Box backgroundColor='gray.200' padding='24px' borderRadius='8px' marginBottom='24px'>
+                  <Text fontWeight={600} size='md' marginBottom='8px'>
+                    HTTP triggers
+                  </Text>
+                  <Text size='xs' mb={4} letterSpacing='-0.12px' fontWeight={400} color='black.200'>
+                    Choose which events send requests and how many rows to include per call.
+                  </Text>
+                  <Text fontWeight={500} size='sm' marginBottom='8px'>
+                    Events to trigger
+                  </Text>
+                  <CheckboxGroup
+                    colorScheme='blue'
+                    value={httpSyncSettings.events}
+                    onChange={(values: (string | number)[]) =>
+                      setHttpSyncSettings({
+                        ...httpSyncSettings,
+                        events: values.map((value) => value.toString()),
+                      })
+                    }
+                  >
+                    <Stack spacing={2}>
+                      <Checkbox value='insert'>Rows added</Checkbox>
+                      <Checkbox value='update'>Rows changed</Checkbox>
+                      <Checkbox value='delete'>Rows removed</Checkbox>
+                    </Stack>
+                  </CheckboxGroup>
+                  <Text fontWeight={500} size='sm' marginTop='16px' marginBottom='8px'>
+                    HTTP batch size
+                  </Text>
+                  <Input
+                    type='number'
+                    min='1'
+                    value={httpSyncSettings.batch_size ?? ''}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                      setHttpSyncSettings({
+                        ...httpSyncSettings,
+                        batch_size: Number(event.target.value),
+                      })
+                    }
+                    background='gray.100'
+                    borderColor='gray.400'
+                  />
+                </Box>
               )}
               {catalogData?.data?.attributes?.catalog?.schema_mode === SchemaMode.schemaless ? (
                 <MapCustomFields
@@ -278,8 +344,9 @@ const EditSync = (): JSX.Element | null => {
           ctaType='submit'
           isCtaLoading={isEditLoading}
           isCtaDisabled={
-            syncData?.destination?.connector_name?.toLowerCase() === 'airtable' &&
-            !(primaryKeyMapping?.source && primaryKeyMapping?.destination)
+            (requiresPrimaryKeyMapping &&
+              !(primaryKeyMapping?.source && primaryKeyMapping?.destination)) ||
+            (isHttpDestination && !(httpSyncSettings?.events?.length))
           }
           isAlignToContentContainer
           isDocumentsSectionRequired
