@@ -10,7 +10,7 @@ module Multiwoven
           def check_connection(connection_config)
             connection_config = connection_config.with_indifferent_access
             destination_url = connection_config[:destination_url]
-            headers = connection_config[:headers]
+            headers = normalize_headers(connection_config[:headers])
             request = Multiwoven::Integrations::Core::HttpClient.request(
               destination_url,
               HTTP_POST,
@@ -44,7 +44,7 @@ module Multiwoven
           def write(sync_config, records, _action = "create")
             connection_config = sync_config.destination.connection_specification.with_indifferent_access
             url = connection_config[:destination_url]
-            headers = connection_config[:headers]
+            headers = normalize_headers(connection_config[:headers])
             log_message_array = []
             write_success = 0
             write_failure = 0
@@ -93,6 +93,21 @@ module Multiwoven
                 }
               end
             }
+          end
+
+          def normalize_headers(raw_headers)
+            case raw_headers
+            when Hash
+              raw_headers
+            when Array
+              raw_headers.compact.to_h
+            else
+              if defined?(ActionController::Parameters) && raw_headers.is_a?(ActionController::Parameters)
+                raw_headers.to_unsafe_h
+              else
+                {}
+              end
+            end
           end
 
           def extract_body(response)
