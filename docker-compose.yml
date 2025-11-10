@@ -48,7 +48,7 @@ services:
       - 8080:8080
   # This section is for the Multiwoven services Backend and Frontend
   db:
-    image: postgres:latest
+    image: postgres:15
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_USER: ${DB_USERNAME}
