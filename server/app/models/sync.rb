@@ -54,6 +54,7 @@ class Sync < ApplicationRecord # rubocop:disable Metrics/ClassLength
   after_save :schedule_sync, if: :schedule_sync?
   after_update :terminate_sync, if: :terminate_sync?
   after_discard :perform_post_discard_sync
+  validate :primary_key_mapping_presence_for_airtable
 
   default_scope -> { kept.order(updated_at: :desc) }
 
@@ -83,7 +84,7 @@ class Sync < ApplicationRecord # rubocop:disable Metrics/ClassLength
   def to_protocol
     catalog = destination.catalog
     Multiwoven::Integrations::Protocol::SyncConfig.new(
-      model: model.to_protocol,
+      model: protocol_model,
       source: source.to_protocol,
       destination: destination.to_protocol,
       stream: catalog.stream_to_protocol(
@@ -95,6 +96,15 @@ class Sync < ApplicationRecord # rubocop:disable Metrics/ClassLength
       current_cursor_field:,
       sync_id: id.to_s,
       increment_strategy_config:
+    )
+  end
+
+  def protocol_model
+    Multiwoven::Integrations::Protocol::Model.new(
+      name: model.name,
+      query: model.query || "",
+      query_type: model.query_type,
+      primary_key: destination_primary_key || model.primary_key || ""
     )
   end
 
@@ -184,6 +194,34 @@ class Sync < ApplicationRecord # rubocop:disable Metrics/ClassLength
     elsif catalog.find_stream_by_name(stream_name).blank?
       errors.add(:stream_name,
                  "Add a valid stream_name associated with destination connector")
+    end
+  end
+
+  def source_primary_key
+    mapping = primary_key_mapping_with_indifferent_access
+    mapping[:source].presence || model.primary_key
+  end
+
+  def destination_primary_key
+    mapping = primary_key_mapping_with_indifferent_access
+    mapping[:destination].presence || source_primary_key
+  end
+
+  private
+
+  def primary_key_mapping_with_indifferent_access
+    (primary_key_mapping || {}).with_indifferent_access
+  end
+
+  def primary_key_mapping_presence_for_airtable
+    return unless destination&.connector_name&.casecmp("airtable")&.zero?
+
+    if source_primary_key.blank?
+      errors.add(:primary_key_mapping, "Source primary key is required for Airtable syncs")
+    end
+
+    if destination_primary_key.blank?
+      errors.add(:primary_key_mapping, "Destination primary key is required for Airtable syncs")
     end
   end
 end

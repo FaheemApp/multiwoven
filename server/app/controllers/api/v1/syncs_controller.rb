@@ -157,7 +157,8 @@ module Api
                                         :field_type,
                                         :hide_embedding,
                                         { embedding_config: %i[mode model api_key] }
-                                      ])
+                                      ],
+                                      primary_key_mapping: %i[source destination])
 
         # TODO: Need to remove this once we implement template and static mapping in frontend
         if params.to_unsafe_h[:sync][:configuration].is_a?(Hash)

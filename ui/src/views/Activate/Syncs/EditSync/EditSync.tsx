@@ -6,12 +6,14 @@ import Loader from '@/components/Loader';
 import React, { useEffect, useState } from 'react';
 import SelectStreams from '@/views/Activate/Syncs/SyncForm/ConfigureSyncs/SelectStreams';
 import MapFields from '../SyncForm/ConfigureSyncs/MapFields';
+import PrimaryKeyMappingSelector from '../SyncForm/ConfigureSyncs/PrimaryKeyMapping';
 import { getConnectorInfo } from '@/services/connectors';
 import { CustomToastStatus } from '@/components/Toast/index';
 import useCustomToast from '@/hooks/useCustomToast';
 import {
   DiscoverResponse,
   FinalizeSyncFormFields,
+  PrimaryKeyMapping,
   SchemaMode,
   Stream,
   TriggerSyncButtonProps,
@@ -55,6 +57,7 @@ const EditSync = (): JSX.Element | null => {
   const [selectedStream, setSelectedStream] = useState<Stream | null>(null);
   const [isEditLoading, setIsEditLoading] = useState<boolean>(false);
   const [configuration, setConfiguration] = useState<FieldMapType[] | null>(null);
+  const [primaryKeyMapping, setPrimaryKeyMapping] = useState<PrimaryKeyMapping | null>(null);
   const activeWorkspaceId = useStore((state) => state.workspaceId);
   const [refresh, setRefresh] = useState(false);
 
@@ -102,6 +105,7 @@ const EditSync = (): JSX.Element | null => {
       destinationFetchResponse?.data.id,
       syncData?.model?.id,
       syncData?.source?.id,
+      primaryKeyMapping,
     );
 
   const formik: FormikProps<FinalizeSyncFormFields> = useFormik({
@@ -180,6 +184,7 @@ const EditSync = (): JSX.Element | null => {
       }
       setSelectedSyncMode(syncData?.sync_mode ?? 'full_refresh');
       setCursorField(syncData?.cursor_field || '');
+      setPrimaryKeyMapping(syncData?.primary_key_mapping ?? null);
     }
   }, [syncFetchResponse]);
 
@@ -223,6 +228,15 @@ const EditSync = (): JSX.Element | null => {
                 setCursorField={setCursorField}
                 streams={streams}
               />
+              {syncData?.destination?.connector_name?.toLowerCase() === 'airtable' && (
+                <PrimaryKeyMappingSelector
+                  model={syncData?.model}
+                  destination={destinationFetchResponse?.data}
+                  stream={selectedStream}
+                  value={primaryKeyMapping}
+                  onChange={setPrimaryKeyMapping}
+                />
+              )}
               {catalogData?.data?.attributes?.catalog?.schema_mode === SchemaMode.schemaless ? (
                 <MapCustomFields
                   model={syncData?.model}
@@ -263,6 +277,10 @@ const EditSync = (): JSX.Element | null => {
           ctaName='Save Changes'
           ctaType='submit'
           isCtaLoading={isEditLoading}
+          isCtaDisabled={
+            syncData?.destination?.connector_name?.toLowerCase() === 'airtable' &&
+            !(primaryKeyMapping?.source && primaryKeyMapping?.destination)
+          }
           isAlignToContentContainer
           isDocumentsSectionRequired
           isContinueCtaRequired

@@ -528,6 +528,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_09_173752) do
     t.string "current_cursor_field"
     t.string "cron_expression"
     t.string "name"
+    t.jsonb "primary_key_mapping", default: {}, null: false
     t.index ["discarded_at"], name: "index_syncs_on_discarded_at"
   end
 

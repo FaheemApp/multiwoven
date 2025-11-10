@@ -65,58 +65,33 @@ module Multiwoven
             write_success = 0
             write_failure = 0
 
-            # Bulk query: Find all existing records in ONE request (instead of N requests)
-            existing_records_map = find_existing_records_bulk(records, primary_key, url, api_key)
-
             records.each_slice(MAX_CHUNK_SIZE) do |chunk|
-              # Separate into updates and inserts based on bulk query results
-              updates = []
-              inserts = []
+              chunk_with_primary_key, chunk_missing_primary_key = chunk.partition { |record| record[primary_key].present? }
 
-              chunk.each do |record|
-                pk_value = record[primary_key]
-                if existing_records_map[pk_value]
-                  # Record exists in Airtable - prepare for UPDATE
-                  updates << { id: existing_records_map[pk_value], fields: record }
-                else
-                  # Record doesn't exist - prepare for INSERT
-                  inserts << { fields: record }
-                end
-              end
-
-              # Process updates with PATCH
-              if updates.any?
-                update_payload = create_payload_with_ids(updates)
-                update_response = Multiwoven::Integrations::Core::HttpClient.request(
-                  url,
-                  "PATCH",
-                  payload: update_payload,
-                  headers: auth_headers(api_key)
+              if chunk_missing_primary_key.any?
+                write_failure += chunk_missing_primary_key.size
+                log_message_array << log_request_response(
+                  "error",
+                  ["UPSERT:SKIPPED", url, { missing_primary_key: primary_key, records: chunk_missing_primary_key }],
+                  "Primary key '#{primary_key}' missing for #{chunk_missing_primary_key.size} record(s)"
                 )
-                if success?(update_response)
-                  write_success += updates.size
-                else
-                  write_failure += updates.size
-                end
-                log_message_array << log_request_response("info", ["PATCH", url, update_payload], update_response)
               end
 
-              # Process inserts with POST
-              if inserts.any?
-                insert_payload = create_payload_with_ids(inserts)
-                insert_response = Multiwoven::Integrations::Core::HttpClient.request(
-                  url,
-                  HTTP_POST,
-                  payload: insert_payload,
-                  headers: auth_headers(api_key)
-                )
-                if success?(insert_response)
-                  write_success += inserts.size
-                else
-                  write_failure += inserts.size
-                end
-                log_message_array << log_request_response("info", [HTTP_POST, url, insert_payload], insert_response)
+              next if chunk_with_primary_key.empty?
+
+              upsert_payload = create_upsert_payload(chunk_with_primary_key, primary_key)
+              response = Multiwoven::Integrations::Core::HttpClient.request(
+                url,
+                "PATCH",
+                payload: upsert_payload,
+                headers: auth_headers(api_key)
+              )
+              if success?(response)
+                write_success += chunk_with_primary_key.size
+              else
+                write_failure += chunk_with_primary_key.size
               end
+              log_message_array << log_request_response("info", ["PATCH", url, upsert_payload], response)
             rescue StandardError => e
               handle_exception(e, {
                                  context: "AIRTABLE:RECORD:WRITE:EXCEPTION",
@@ -139,60 +114,11 @@ module Multiwoven
 
           private
 
-          def find_existing_records_bulk(records, primary_key, url, api_key)
-            return {} if records.empty?
-
-            # Build OR formula to find all records in a single query
-            # Example: OR({id}='1', {id}='2', {id}='3')
-            formulas = records.map do |record|
-              pk_value = record[primary_key]
-              escaped_value = pk_value.to_s.gsub("'", "\\'")
-              "{#{primary_key}}='#{escaped_value}'"
-            end
-
-            # Airtable has a URL length limit, so batch queries if needed
-            # Typically safe up to ~100 records per query
-            existing_map = {}
-            formulas.each_slice(100) do |formula_batch|
-              formula = "OR(#{formula_batch.join(', ')})"
-              encoded_formula = CGI.escape(formula)
-              search_url = "#{url}?filterByFormula=#{encoded_formula}"
-
-              response = Multiwoven::Integrations::Core::HttpClient.request(
-                search_url,
-                HTTP_GET,
-                headers: auth_headers(api_key)
-              )
-
-              next unless success?(response)
-
-              body = extract_body(response)
-              airtable_records = body["records"] || []
-
-              # Build map: primary_key_value => airtable_record_id
-              airtable_records.each do |airtable_record|
-                pk_value = airtable_record.dig("fields", primary_key)
-                existing_map[pk_value] = airtable_record["id"] if pk_value
-              end
-            end
-
-            existing_map
-          rescue StandardError => e
-            handle_exception(e, {
-                               context: "AIRTABLE:BULK:FIND:EXCEPTION",
-                               type: "error"
-                             })
-            {} # Return empty map on error - all records will be treated as inserts
-          end
-
-          def create_payload_with_ids(processed_records)
+          def create_upsert_payload(records, primary_key)
             {
-              "records" => processed_records
-            }
-          end
-
-          def create_payload(records)
-            {
+              "performUpsert" => {
+                "fieldsToMergeOn" => [primary_key]
+              },
               "records" => records.map do |record|
                 {
                   "fields" => record

@@ -93,7 +93,7 @@ module ReverseEtl
       end
 
       def log_skip_sync_run(sync_record, record, sync_run, error = nil)
-        primary_key = record.data.with_indifferent_access[sync_run.sync.model.primary_key]
+        primary_key = record.data.with_indifferent_access[sync_run.sync.source_primary_key]
         message = error ? error.message : "Skipping sync record"
 
         Rails.logger.info({
@@ -106,7 +106,8 @@ module ReverseEtl
       end
 
       def process_record(record, sync_run, model)
-        primary_key = record.data.with_indifferent_access[model.primary_key]
+        data = record.data.with_indifferent_access
+        primary_key = data[sync_run.sync&.source_primary_key] || data[model.primary_key]
         raise StandardError, "Primary key cannot be blank" if primary_key.blank?
 
         find_or_initialize_sync_record(sync_run, primary_key)

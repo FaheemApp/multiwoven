@@ -4,8 +4,13 @@ import { ModelEntity } from '@/views/Models/types';
 import { Box } from '@chakra-ui/react';
 import { FormEvent, useContext, Dispatch, SetStateAction, useState, useEffect } from 'react';
 import SelectStreams from './SelectStreams';
-import { Stream, FieldMap as FieldMapType } from '@/views/Activate/Syncs/types';
+import type {
+  Stream,
+  FieldMap as FieldMapType,
+  PrimaryKeyMapping as PrimaryKeyMappingType,
+} from '@/views/Activate/Syncs/types';
 import MapFields from './MapFields';
+import PrimaryKeyMappingSelector from './PrimaryKeyMapping';
 import { ConnectorItem } from '@/views/Connectors/types';
 import FormFooter from '@/components/FormFooter';
 import MapCustomFields from './MapCustomFields';
@@ -23,6 +28,8 @@ type ConfigureSyncsProps = {
   cursorField: string;
   setSelectedStream: Dispatch<SetStateAction<Stream | null>>;
   setConfiguration: Dispatch<SetStateAction<FieldMapType[] | null>>;
+  primaryKeyMapping: PrimaryKeyMappingType | null;
+  setPrimaryKeyMapping: Dispatch<SetStateAction<PrimaryKeyMappingType | null>>;
   setSchemaMode: Dispatch<SetStateAction<SchemaMode | null>>;
   setSelectedSyncMode: Dispatch<SetStateAction<string>>;
   setCursorField: Dispatch<SetStateAction<string>>;
@@ -31,10 +38,12 @@ type ConfigureSyncsProps = {
 const ConfigureSyncs = ({
   selectedStream,
   configuration,
+  primaryKeyMapping,
   selectedSyncMode,
   cursorField,
   setSelectedStream,
   setConfiguration,
+  setPrimaryKeyMapping,
   setSchemaMode,
   setSelectedSyncMode,
   setCursorField,
@@ -60,6 +69,15 @@ const ConfigureSyncs = ({
     setConfiguration(config);
   };
 
+  const requiresPrimaryKeyMapping =
+    selectedDestination?.attributes?.connector_name?.toLowerCase() === 'airtable';
+
+  useEffect(() => {
+    if (!requiresPrimaryKeyMapping) {
+      setPrimaryKeyMapping(null);
+    }
+  }, [requiresPrimaryKeyMapping, setPrimaryKeyMapping]);
+
   const handleOnSubmit = (e: FormEvent) => {
     e.preventDefault();
     const payload = {
@@ -70,6 +88,7 @@ const ConfigureSyncs = ({
       configuration,
       sync_mode: selectedSyncMode,
       cursor_field: cursorField,
+      primary_key_mapping: primaryKeyMapping,
     };
 
     handleMoveForward(stepInfo?.formKey as string, payload);
@@ -104,6 +123,10 @@ const ConfigureSyncs = ({
 
   const streams = catalogData?.data?.attributes?.catalog?.streams || [];
 
+  const isPrimaryKeyMappingComplete =
+    !requiresPrimaryKeyMapping ||
+    Boolean(primaryKeyMapping?.source?.length && primaryKeyMapping?.destination?.length);
+
   return (
     <Box width='100%' display='flex' justifyContent='center'>
       <ContentContainer>
@@ -119,6 +142,15 @@ const ConfigureSyncs = ({
             setCursorField={setCursorField}
             streams={streams}
           />
+          {requiresPrimaryKeyMapping && (
+            <PrimaryKeyMappingSelector
+              model={selectedModel}
+              destination={selectedDestination}
+              stream={selectedStream}
+              value={primaryKeyMapping}
+              onChange={setPrimaryKeyMapping}
+            />
+          )}
           {catalogData?.data?.attributes?.catalog?.schema_mode === SchemaMode.schemaless ? (
             <MapCustomFields
               model={selectedModel}
@@ -141,7 +173,7 @@ const ConfigureSyncs = ({
           <FormFooter
             ctaName='Continue'
             ctaType='submit'
-            isCtaDisabled={!selectedStream || !SchemaMode.schemaless}
+            isCtaDisabled={!selectedStream || !isPrimaryKeyMappingComplete}
             isBackRequired
             isContinueCtaRequired
             isDocumentsSectionRequired

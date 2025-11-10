@@ -24,6 +24,7 @@ FactoryBot.define do
     association :source, factory: :connector
     association :destination, factory: :connector
     configuration { { test: "Test" } }
+    primary_key_mapping { { "source" => "id", "destination" => "id" } }
     schedule_type { 1 }
     sync_interval { 1 }
     stream_name { "profile" }

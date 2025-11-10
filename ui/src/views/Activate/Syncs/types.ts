@@ -1,6 +1,5 @@
 import { ModelEntity } from '@/views/Models/types';
 import { RJSFSchema } from '@rjsf/utils';
-import { FieldMap as FieldMapType } from '@/views/Activate/Syncs/types';
 import { APIRequestMethod } from '@/services/common';
 
 export type Stream = {
@@ -58,6 +57,11 @@ export type FieldMap = {
   isRequired?: boolean;
 };
 
+export type PrimaryKeyMapping = {
+  source: string;
+  destination: string;
+};
+
 export type SyncsConfigurationForTemplateMapping = {
   data: {
     configurations: {
@@ -78,8 +82,9 @@ export type ConfigSync = {
   model_id: string;
   schedule_type: string;
   cron_expression: string;
-  configuration: FieldMapType[];
+  configuration: FieldMap[];
   stream_name: string;
+  primary_key_mapping?: PrimaryKeyMapping | null;
 };
 
 export interface SyncEntity extends ConfigSync {
@@ -133,6 +138,7 @@ export type CreateSyncResponse = {
       id: string;
     };
     model: ModelEntity;
+    primary_key_mapping?: PrimaryKeyMapping | null;
   };
   id: string;
   type: 'syncs';

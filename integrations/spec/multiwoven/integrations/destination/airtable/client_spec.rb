@@ -179,16 +179,19 @@ RSpec.describe Multiwoven::Integrations::Destination::Airtable::Client do
     end
   end
 
-  describe "#create_payload" do
-    it "returns the correct payload structure" do
+  describe "#create_upsert_payload" do
+    it "builds payload with performUpsert and record fields" do
       expected_payload = {
+        "performUpsert" => {
+          "fieldsToMergeOn" => ["id"]
+        },
         "records" => [
           { "fields" => { "Name" => "Alice" } },
           { "fields" => { "Name" => "Bob" } }
         ]
       }
 
-      payload = client.send(:create_payload, records)
+      payload = client.send(:create_upsert_payload, records, "id")
       actual_payload = payload.deep_transform_keys(&:to_s)
       expect(actual_payload).to eq(expected_payload)
     end

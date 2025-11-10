@@ -82,6 +82,12 @@ RSpec.describe Sync, type: :model do
       expect(protocol.sync_id).to eq(sync.id.to_s)
     end
 
+    it "overrides protocol model primary key when destination mapping exists" do
+      sync.update!(primary_key_mapping: { "source" => "id", "destination" => "ExternalId" })
+      protocol = sync.to_protocol
+      expect(protocol.model.primary_key).to eq("ExternalId")
+    end
+
     it "returns increment strategy config protocol" do
       sync.source.configuration["increment_type"] = "Page"
       sync.source.configuration["page_start"] = "1"
@@ -471,6 +477,50 @@ RSpec.describe Sync, type: :model do
         sync.cron_expression = "0 0 * * *"
         expect(sync.schedule_sync?).to be true
       end
+    end
+  end
+
+  describe "primary key mapping helpers" do
+    let(:workspace) { create(:workspace) }
+    let(:source) { create(:connector, connector_type: "source", workspace:, connector_name: "Snowflake") }
+    let(:destination) { create(:connector, connector_type: "destination", workspace:) }
+    let!(:catalog) { create(:catalog, connector: destination, workspace:) }
+    let(:model) { create(:model, workspace:, connector: source, primary_key: "id") }
+
+    it "falls back to model primary key when mapping is blank" do
+      sync = create(:sync, workspace:, source:, destination:, model:, primary_key_mapping: {})
+      expect(sync.source_primary_key).to eq("id")
+      expect(sync.destination_primary_key).to eq("id")
+    end
+
+    it "uses mapping values when provided" do
+      sync = create(
+        :sync,
+        workspace:,
+        source:,
+        destination:,
+        model:,
+        primary_key_mapping: { "source" => "db_id", "destination" => "ExternalId" }
+      )
+      expect(sync.source_primary_key).to eq("db_id")
+      expect(sync.destination_primary_key).to eq("ExternalId")
+    end
+
+    it "requires mapping for Airtable destinations" do
+      airtable_destination = create(:connector, connector_type: "destination", connector_name: "Airtable")
+      create(:catalog, connector: airtable_destination)
+      sync = build(
+        :sync,
+        workspace:,
+        source:,
+        destination: airtable_destination,
+        model:,
+        primary_key_mapping: { "source" => "", "destination" => "" }
+      )
+      expect(sync).not_to be_valid
+      expect(sync.errors[:primary_key_mapping]).to include(
+        "Source primary key is required for Airtable syncs"
+      )
     end
   end
 end
