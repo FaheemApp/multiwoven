@@ -60,6 +60,7 @@ const EditSync = (): JSX.Element | null => {
   const [configuration, setConfiguration] = useState<FieldMapType[] | null>(null);
   const [primaryKeyMapping, setPrimaryKeyMapping] = useState<PrimaryKeyMapping | null>(null);
   const [httpSyncSettings, setHttpSyncSettings] = useState<HTTPSyncSettings | null>(null);
+  const [hasHydratedSyncData, setHasHydratedSyncData] = useState(false);
   const activeWorkspaceId = useStore((state) => state.workspaceId);
   const [refresh, setRefresh] = useState(false);
 
@@ -166,48 +167,66 @@ const EditSync = (): JSX.Element | null => {
   }, [isError]);
 
   useEffect(() => {
-    if (syncFetchResponse) {
-      formik.setValues({
-        sync_interval: syncData?.sync_interval ?? 0,
-        sync_interval_unit: syncData?.sync_interval_unit ?? 'minutes',
-        sync_mode: syncData?.sync_mode ?? 'full_refresh',
-        schedule_type: syncData?.schedule_type ?? 'interval',
-        cron_expression: syncData?.cron_expression ?? '',
-      });
-
-      if (Array.isArray(syncFetchResponse?.data?.attributes?.configuration)) {
-        setConfiguration(syncFetchResponse.data.attributes.configuration);
-      } else {
-        const transformedConfigs = Object.entries(
-          syncFetchResponse?.data?.attributes?.configuration || {},
-        ).map(([model, destination]) => {
-          return {
-            from: model,
-            to: destination,
-            mapping_type: 'standard',
-          };
-        });
-        setConfiguration(transformedConfigs);
-      }
-      setSelectedSyncMode(syncData?.sync_mode ?? 'full_refresh');
-      setCursorField(syncData?.cursor_field || '');
-      const destinationName = syncData?.destination?.connector_name?.toLowerCase();
-      if (destinationName === 'http') {
-        const events =
-          syncData?.http_sync_settings?.events && syncData.http_sync_settings.events.length > 0
-            ? syncData.http_sync_settings.events
-            : ['insert', 'update', 'delete'];
-        const batchSize = Number(syncData?.http_sync_settings?.batch_size) || 1000;
-        setHttpSyncSettings({
-          events,
-          batch_size: batchSize,
-        });
-      } else {
-        setHttpSyncSettings(null);
-      }
-      setPrimaryKeyMapping(syncData?.primary_key_mapping ?? null);
+    if (!syncData || hasHydratedSyncData) {
+      return;
     }
-  }, [syncFetchResponse]);
+
+    formik.setValues({
+      sync_interval: syncData?.sync_interval ?? 0,
+      sync_interval_unit: syncData?.sync_interval_unit ?? 'minutes',
+      sync_mode: syncData?.sync_mode ?? 'full_refresh',
+      schedule_type: syncData?.schedule_type ?? 'interval',
+      cron_expression: syncData?.cron_expression ?? '',
+    });
+
+    const syncConfiguration = syncData?.configuration;
+    if (Array.isArray(syncConfiguration)) {
+      setConfiguration(syncConfiguration);
+    } else {
+      const transformedConfigs = Object.entries(syncConfiguration || {}).map(
+        ([model, destination]) => ({
+          from: model,
+          to: destination,
+          mapping_type: 'standard',
+        }),
+      );
+      setConfiguration(transformedConfigs);
+    }
+
+    setSelectedSyncMode(syncData?.sync_mode ?? 'full_refresh');
+    setCursorField(syncData?.cursor_field || '');
+
+    const destinationName = syncData?.destination?.connector_name?.toLowerCase();
+    if (destinationName === 'http') {
+      const events =
+        syncData?.http_sync_settings?.events && syncData.http_sync_settings.events.length > 0
+          ? syncData.http_sync_settings.events
+          : ['insert', 'update', 'delete'];
+      const batchSize = Number(syncData?.http_sync_settings?.batch_size) || 1000;
+      setHttpSyncSettings({
+        events,
+        batch_size: batchSize,
+      });
+    } else {
+      setHttpSyncSettings(null);
+    }
+
+    setPrimaryKeyMapping(syncData?.primary_key_mapping ?? null);
+    setHasHydratedSyncData(true);
+  }, [
+    syncData,
+    hasHydratedSyncData,
+    formik,
+    setConfiguration,
+    setSelectedSyncMode,
+    setCursorField,
+    setHttpSyncSettings,
+    setPrimaryKeyMapping,
+  ]);
+
+  useEffect(() => {
+    setHasHydratedSyncData(false);
+  }, [syncId]);
 
   useEffect(() => {
     if (catalogData?.errors && catalogData?.errors?.length > 0) {
