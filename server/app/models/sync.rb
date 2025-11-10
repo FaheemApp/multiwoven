@@ -86,13 +86,20 @@ class Sync < ApplicationRecord # rubocop:disable Metrics/ClassLength
 
   def to_protocol
     catalog = destination.catalog
+    stream_proto = catalog.stream_to_protocol(
+      catalog.find_stream_by_name(stream_name)
+    )
+    if destination.connector_name.casecmp("http").zero?
+      stream_proto = Multiwoven::Integrations::Protocol::Stream.new(
+        stream_proto.to_h.merge(batch_size: http_batch_size)
+      )
+    end
+
     Multiwoven::Integrations::Protocol::SyncConfig.new(
       model: protocol_model,
       source: source.to_protocol,
       destination: destination.to_protocol,
-      stream: catalog.stream_to_protocol(
-        catalog.find_stream_by_name(stream_name)
-      ),
+      stream: stream_proto,
       sync_mode: Multiwoven::Integrations::Protocol::SyncMode[sync_mode],
       destination_sync_mode: Multiwoven::Integrations::Protocol::DestinationSyncMode["insert"],
       cursor_field:,

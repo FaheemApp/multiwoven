@@ -6,7 +6,7 @@ module Multiwoven
       module Http
         include Multiwoven::Integrations::Core
         class Client < DestinationConnector
-          MAX_CHUNK_SIZE = 10
+          DEFAULT_CHUNK_SIZE = 10
           def check_connection(connection_config)
             connection_config = connection_config.with_indifferent_access
             destination_url = connection_config[:destination_url]
@@ -48,7 +48,8 @@ module Multiwoven
             log_message_array = []
             write_success = 0
             write_failure = 0
-            records.each_slice(MAX_CHUNK_SIZE) do |chunk|
+            chunk_size = determine_chunk_size(sync_config)
+            records.each_slice(chunk_size) do |chunk|
               payload = create_payload(chunk)
               args = [sync_config.stream.request_method, url, payload]
               response = Multiwoven::Integrations::Core::HttpClient.request(
@@ -83,7 +84,14 @@ module Multiwoven
                              })
           end
 
-          private
+        private
+
+          def determine_chunk_size(sync_config)
+            stream_batch_size = sync_config.stream.batch_size.to_i if sync_config.stream.respond_to?(:batch_size)
+            return DEFAULT_CHUNK_SIZE if stream_batch_size.nil? || stream_batch_size <= 0
+
+            stream_batch_size
+          end
 
           def create_payload(records)
             {
