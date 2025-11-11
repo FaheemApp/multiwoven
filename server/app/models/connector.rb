@@ -110,16 +110,19 @@ class Connector < ApplicationRecord
   end
 
   # TODO: move the method to integration gem
-  def execute_query(query, limit: 50)
+  def execute_query(query, limit: 5)
     connection_config = resolved_configuration.with_indifferent_access
     client = connector_client.new
     db = client.send(:create_connection, connection_config)
-    query = query.chomp(";")
+    query = query.chomp(";").strip
 
-    # Check if the query already has a LIMIT clause
-    has_limit = query.match?(/LIMIT \s*\d+\s*$/i)
+    # Check if the query already has a LIMIT clause (handle newlines and whitespace)
+    has_limit = query.match?(/LIMIT\s+\d+\s*$/im)
     # Append LIMIT only if not already present
     final_query = has_limit ? query : "#{query} LIMIT #{limit}"
+
+    Rails.logger.debug("Query execution - Original: #{query.inspect}, Has limit: #{has_limit}, Limit param: #{limit}, Final: #{final_query.inspect}")
+
     client.send(:query, db, final_query)
   end
 
