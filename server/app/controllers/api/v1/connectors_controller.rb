@@ -106,7 +106,7 @@ module Api
           result = QuerySource.call(
             connector: @connector,
             query: params[:query],
-            limit: params[:limit] || 50
+            limit: params[:limit] || 5
           )
 
           if result.success?
