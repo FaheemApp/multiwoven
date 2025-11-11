@@ -38,6 +38,39 @@ const MapFields = ({
     () => getRequiredProperties(stream?.json_schema),
     [stream],
   );
+  const isAirtableDestination =
+    destination?.attributes?.connector_name?.toLowerCase() === 'airtable';
+
+  const normalizeColumnName = (name: string) => name.replace(/\s+/g, '').toLowerCase();
+
+  const handleAutoMapFields = () => {
+    if (!stream) return;
+
+    const destinationLookup = destinationColumns.reduce<Record<string, string>>((acc, column) => {
+      acc[normalizeColumnName(column)] = column;
+      return acc;
+    }, {});
+
+    const autoMappedFields = modelColumns.reduce<FieldMapType[]>((acc, column) => {
+      const normalized = normalizeColumnName(column);
+      const destinationColumn = destinationLookup[normalized];
+
+      if (destinationColumn) {
+        acc.push({
+          from: column,
+          to: destinationColumn,
+          mapping_type: OPTION_TYPE.STANDARD,
+        });
+      }
+
+      return acc;
+    }, []);
+
+    if (autoMappedFields.length > 0) {
+      setFields(autoMappedFields);
+      handleOnConfigChange(autoMappedFields);
+    }
+  };
 
   useEffect(() => {
     if (data) {
@@ -133,9 +166,23 @@ const MapFields = ({
       borderRadius='8px'
       marginBottom={isEdit ? '20px' : '100px'}
     >
-      <Text fontWeight={600} size='md'>
-        Map fields to {destination?.attributes?.connector_name}
-      </Text>
+      <Box display='flex' alignItems='center' justifyContent='space-between'>
+        <Text fontWeight={600} size='md'>
+          Map fields to {destination?.attributes?.connector_name}
+        </Text>
+        {isAirtableDestination && (
+          <Button
+            variant='shell'
+            size='sm'
+            onClick={handleAutoMapFields}
+            isDisabled={
+              !stream || modelColumns.length === 0 || destinationColumns.length === 0
+            }
+          >
+           Auto Map <span style={{ fontSize: 19 }}>✨</span>
+          </Button>
+        )}
+      </Box>
       <Text size='xs' mb={6} letterSpacing='-0.12px' fontWeight={400} color='black.200'>
         {`Configure how the columns in your query results should be mapped to fields in ${destination.attributes.connector_name}.`}
       </Text>
