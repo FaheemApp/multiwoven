@@ -121,9 +121,8 @@ class Connector < ApplicationRecord
     # Append LIMIT only if not already present
     final_query = has_limit ? query : "#{query} LIMIT #{limit}"
 
-    Rails.logger.debug("Query execution - Original: #{query.inspect}, Has limit: #{has_limit}, Limit param: #{limit}, Final: #{final_query.inspect}")
-
-    client.send(:query, db, final_query)
+    result = client.send(:query, db, final_query)
+    result
   end
 
   def generate_response(payload)

@@ -21,7 +21,6 @@ export type ModelAPIResponse<T> = {
 type ModelPreviewPayload = {
   query: string;
   limit?: number;
-  schema_only?: boolean;
 };
 
 export type Field = {
@@ -38,6 +37,7 @@ export type ModelAttributes = {
   name: string;
   description: string;
   primary_key: string;
+  schema: { [key: string]: string };
   connector: {
     icon: string;
     [key: string]: string | null;
@@ -69,14 +69,13 @@ export const getAllModels = async ({
     url: buildUrlWithParams('/models', { query_type: type }),
   });
 
-export const getModelPreviewById = async (query: string, id: string, options?: { limit?: number; schemaOnly?: boolean }) =>
+export const getModelPreviewById = async (query: string, id: string, options?: { limit?: number }) =>
   multiwovenFetch<ModelPreviewPayload, ApiResponse<Field[]>>({
     method: 'post',
     url: '/connectors/' + id + '/query_source',
     data: {
       query: query,
-      limit: options?.limit,
-      schema_only: options?.schemaOnly
+      limit: options?.limit
     },
   });
 

@@ -3,10 +3,8 @@ import type { Stream, PrimaryKeyMapping as PrimaryKeyMappingType } from '@/views
 import type { ModelEntity } from '@/views/Models/types';
 import { Box, FormControl, FormLabel, Select, Text } from '@chakra-ui/react';
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getModelPreviewById } from '@/services/models';
-import { useStore } from '@/stores';
 import { getPathFromObject } from '@/views/Activate/Syncs/utils';
+import { useModelColumns } from '@/views/Activate/Syncs/hooks/useModelColumns';
 
 type PrimaryKeyMappingSelectorProps = {
   model: ModelEntity;
@@ -26,18 +24,7 @@ const PrimaryKeyMappingSelector = ({
   const [selectedSourceField, setSelectedSourceField] = useState<string>('');
   const [selectedDestinationField, setSelectedDestinationField] = useState<string>('');
 
-  const activeWorkspaceId = useStore((state) => state.workspaceId);
-
-  const { data: previewModelData } = useQuery({
-    queryKey: ['syncs', 'preview-model', model?.connector?.id],
-    queryFn: () => getModelPreviewById(model?.query, String(model?.connector?.id)),
-    enabled: !!model?.connector?.id && activeWorkspaceId > 0,
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
-  });
-
-  const firstRow = Array.isArray(previewModelData?.data) && previewModelData.data[0];
-  const modelColumns = useMemo(() => Object.keys(firstRow ?? {}), [firstRow]);
+  const { columns: modelColumns } = useModelColumns(model);
   const destinationColumns = useMemo(() => getPathFromObject(stream?.json_schema), [stream]);
 
   useEffect(() => {

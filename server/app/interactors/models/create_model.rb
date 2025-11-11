@@ -10,6 +10,7 @@ module Models
               .create(context.model_params)
 
       if model.persisted?
+        Models::SchemaCacheService.new(model).call
         context.model = model
       else
         context.fail!(model:)

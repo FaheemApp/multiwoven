@@ -33,6 +33,7 @@ export type GetModelByIdResponse = {
     query: string;
     query_type: QueryType;
     updated_at: string;
+    schema: Record<string, string>;
     connector: {
       [key: string]: string | null;
     };
@@ -63,6 +64,7 @@ export type ModelEntity = {
   icon: string;
   name: string;
   primary_key?: string;
+  schema?: Record<string, string>;
 };
 
 export type ModelColumnFields = 'name' | 'query_type' | 'last_updated';

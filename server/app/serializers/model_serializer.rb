@@ -1,10 +1,14 @@
 # frozen_string_literal: true
 
 class ModelSerializer < ActiveModel::Serializer
-  attributes :id, :name, :description, :query, :query_type, :configuration, :primary_key, :created_at, :updated_at
+  attributes :id, :name, :description, :query, :query_type, :configuration, :primary_key, :schema, :created_at, :updated_at
 
   attribute :connector do
     ConnectorSerializer.new(object.connector).attributes
+  end
+
+  def schema
+    object.schema.presence || Models::SchemaCacheService.new(object).call || {}
   end
 
   def configuration

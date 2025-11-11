@@ -5,11 +5,15 @@ module Models
     include Interactor
 
     def call
-      unless context
-             .model
-             .update(context.model_params)
+      model = context.model
+      query_changed = model.query != context.model_params[:query]
+
+      unless model.update(context.model_params)
         context.fail!(model: context.model)
+        return
       end
+
+      Models::SchemaCacheService.new(model).call(force: query_changed)
     end
   end
 end

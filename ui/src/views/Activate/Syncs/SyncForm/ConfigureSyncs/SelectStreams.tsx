@@ -4,10 +4,10 @@ import { ModelEntity } from '@/views/Models/types';
 import { useQuery } from '@tanstack/react-query';
 import { getCatalog } from '@/services/syncs';
 import { ConnectorItem } from '@/views/Connectors/types';
-import { getModelPreviewById } from '@/services/models';
 import { SetStateAction, Dispatch } from 'react';
 import { FiInfo } from 'react-icons/fi';
 import { useStore } from '@/stores';
+import { useModelColumns } from '@/views/Activate/Syncs/hooks/useModelColumns';
 
 type SelectStreamsProps = {
   model: ModelEntity;
@@ -48,17 +48,7 @@ const SelectStreams = ({
     refetchOnWindowFocus: false,
   });
 
-  const { data: previewModelData } = useQuery({
-    queryKey: ['syncs', 'preview-model', model?.connector?.id, activeWorkspaceId],
-    queryFn: () => getModelPreviewById(model?.query, String(model?.connector?.id)),
-    enabled: !!model?.connector?.id && activeWorkspaceId > 0,
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
-  });
-
-  const firstRow = Array.isArray(previewModelData?.data) && previewModelData.data[0];
-
-  const modelColumns = Object.keys(firstRow ?? {});
+  const { columns: modelColumns } = useModelColumns(model);
 
   let selectedStreamIndex = -1;
 

@@ -1,14 +1,12 @@
 import { ConnectorItem } from '@/views/Connectors/types';
 import { ModelEntity } from '@/views/Models/types';
 import { Box, Button, CloseButton, Text } from '@chakra-ui/react';
-import { getModelPreviewById } from '@/services/models';
-import { useQuery } from '@tanstack/react-query';
 import { FieldMap as FieldMapType, Stream } from '@/views/Activate/Syncs/types';
 import FieldMap from './FieldMap';
 import { useEffect, useState } from 'react';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import { OPTION_TYPE } from './TemplateMapping/TemplateMapping';
-import { useStore } from '@/stores';
+import { useModelColumns } from '@/views/Activate/Syncs/hooks/useModelColumns';
 
 type MapCustomFieldsProps = {
   model: ModelEntity;
@@ -30,16 +28,7 @@ const MapCustomFields = ({
   stream,
 }: MapCustomFieldsProps): JSX.Element | null => {
   const [fields, setFields] = useState<FieldMapType[]>([{ from: '', to: '', mapping_type: '' }]);
-
-  const activeWorkspaceId = useStore((state) => state.workspaceId);
-
-  const { data: previewModelData } = useQuery({
-    queryKey: ['syncs', 'preview-model', model?.connector?.id, activeWorkspaceId],
-    queryFn: () => getModelPreviewById(model?.query, String(model?.connector?.id), { schemaOnly: true }),
-    enabled: !!model?.connector?.id && activeWorkspaceId > 0,
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
-  });
+  const { columns: modelColumns } = useModelColumns(model);
 
   useEffect(() => {
     if (data) {
@@ -55,10 +44,6 @@ const MapCustomFields = ({
       }
     }
   }, [data]);
-
-  const firstRow = Array.isArray(previewModelData?.data) && previewModelData.data[0];
-
-  const modelColumns = Object.keys(firstRow ?? {});
 
   const handleOnAppendField = () => {
     setFields([...fields, { from: '', to: '', mapping_type: '' }]);
