@@ -57,10 +57,12 @@ module Multiwoven
 
       def log_request_response(level, request, response)
         response_data = format_response(response)
+        # Ensure response is always a string for frontend compatibility
+        response_string = response_data.is_a?(Hash) ? response_data.to_json : response_data.to_s
         Integrations::Protocol::LogMessage.new(
           name: self.class.name,
           level: level,
-          message: { request: request.to_s, response: response_data, level: level }.to_json
+          message: { request: request.to_s, response: response_string, level: level }.to_json
         )
       end
 
