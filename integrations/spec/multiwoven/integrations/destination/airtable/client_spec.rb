@@ -177,6 +177,31 @@ RSpec.describe Multiwoven::Integrations::Destination::Airtable::Client do
       expect(log_message.message).to include("request")
       expect(log_message.message).to include("response")
     end
+
+    it "logs detailed error response information including status and body" do
+      error_response_body = { "error" => { "type" => "INVALID_REQUEST", "message" => "Field is required" } }.to_json
+      detailed_failure_response = instance_double("Response",
+        success?: false,
+        body: error_response_body,
+        code: "422",
+        message: "Unprocessable Entity"
+      )
+      allow(detailed_failure_response).to receive(:respond_to?).with(:code).and_return(true)
+      allow(detailed_failure_response).to receive(:respond_to?).with(:body).and_return(true)
+
+      allow(Multiwoven::Integrations::Core::HttpClient).to receive(:request).and_return(detailed_failure_response)
+      sync_config = Multiwoven::Integrations::Protocol::SyncConfig.from_json(sync_config_json.to_json)
+      message = client.write(sync_config, records)
+
+      log_message = message.tracking.logs.first
+      parsed_message = JSON.parse(log_message.message)
+
+      expect(parsed_message["response"]).to be_a(Hash)
+      expect(parsed_message["response"]["status"]).to eq("422")
+      expect(parsed_message["response"]["message"]).to eq("Unprocessable Entity")
+      expect(parsed_message["response"]["body"]).to be_a(Hash)
+      expect(parsed_message["response"]["body"]["error"]["type"]).to eq("INVALID_REQUEST")
+    end
   end
 
   describe "#create_upsert_payload" do

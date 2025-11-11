@@ -56,11 +56,44 @@ module Multiwoven
       end
 
       def log_request_response(level, request, response)
+        response_data = format_response(response)
         Integrations::Protocol::LogMessage.new(
           name: self.class.name,
           level: level,
-          message: { request: request.to_s, response: response.to_s, level: level }.to_json
+          message: { request: request.to_s, response: response_data, level: level }.to_json
         )
+      end
+
+      def format_response(response)
+        # Handle HTTP response objects (Net::HTTPResponse)
+        if response.respond_to?(:code) && response.respond_to?(:body)
+          {
+            status: response.code,
+            message: response.message,
+            body: parse_response_body(response.body)
+          }
+        else
+          # For other response types, convert to string
+          response.to_s
+        end
+      rescue StandardError => e
+        # Fallback to original behavior if anything goes wrong
+        logger.error("Error formatting response: #{e.message}")
+        response.to_s
+      end
+
+      def parse_response_body(body)
+        return nil if body.nil? || body.empty?
+
+        # Try to parse as JSON for better readability
+        JSON.parse(body)
+      rescue JSON::ParserError
+        # If not JSON, return the raw body
+        body
+      rescue StandardError => e
+        # Fallback to raw body for any other errors
+        logger.error("Error parsing response body: #{e.message}")
+        body
       end
 
       def create_log_message(context, type, message)
