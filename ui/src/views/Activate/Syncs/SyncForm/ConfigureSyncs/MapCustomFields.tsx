@@ -35,7 +35,7 @@ const MapCustomFields = ({
 
   const { data: previewModelData } = useQuery({
     queryKey: ['syncs', 'preview-model', model?.connector?.id, activeWorkspaceId],
-    queryFn: () => getModelPreviewById(model?.query, String(model?.connector?.id)),
+    queryFn: () => getModelPreviewById(model?.query, String(model?.connector?.id), { schemaOnly: true }),
     enabled: !!model?.connector?.id && activeWorkspaceId > 0,
     refetchOnMount: true,
     refetchOnWindowFocus: false,

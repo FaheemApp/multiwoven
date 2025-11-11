@@ -103,10 +103,14 @@ module Api
       def query_source
         authorize @connector
         if @connector.source?
+          # Use LIMIT 0 for schema-only queries (much faster, no data fetched)
+          # Use LIMIT 5 for preview queries (shows sample data)
+          limit = params[:schema_only] ? 0 : (params[:limit] || 5)
+
           result = QuerySource.call(
             connector: @connector,
             query: params[:query],
-            limit: 5
+            limit: limit
           )
 
           if result.success?
