@@ -9,6 +9,10 @@ module Multiwoven::Integrations::Source
     include Multiwoven::Integrations::Core
     Multiwoven::Integrations::Service.logger.debug("[MYSQL_CONNECTION] MariaDB::Client file loaded")
     class Client < SourceConnector
+      CONNECT_TIMEOUT = ENV.fetch("MULTIWOVEN_MARIADB_CONNECT_TIMEOUT", 10).to_i
+      READ_TIMEOUT = ENV.fetch("MULTIWOVEN_MARIADB_READ_TIMEOUT", 120).to_i
+      WRITE_TIMEOUT = ENV.fetch("MULTIWOVEN_MARIADB_WRITE_TIMEOUT", 120).to_i
+
       def check_connection(connection_config)
         connection = nil
         connection_config = connection_config.with_indifferent_access
@@ -97,9 +101,9 @@ module Multiwoven::Integrations::Source
           encoding: "utf8mb4",
           init_command: "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
           reconnect: false,  # Disable automatic reconnection
-          connect_timeout: 10,
-          read_timeout: 30,
-          write_timeout: 30
+          connect_timeout: 20,
+          read_timeout: 600,
+          write_timeout: 600
         )
         client
       end
