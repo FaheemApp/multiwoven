@@ -46,4 +46,73 @@ RSpec.describe Liquid::CustomFilters do
       expect(to_datetime(nil, "%m/%d/%Y %H:%M")).to eq(nil)
     end
   end
+
+  describe ".parse_json" do
+    it "parses valid JSON array" do
+      expect(parse_json('["a", "b", "c"]')).to eq(["a", "b", "c"])
+    end
+
+    it "parses valid JSON object" do
+      expect(parse_json('{"key": "value"}')).to eq({ "key" => "value" })
+    end
+
+    it "returns original string for invalid JSON" do
+      expect(parse_json("not json")).to eq("not json")
+    end
+
+    it "returns nil for nil input" do
+      expect(parse_json(nil)).to eq(nil)
+    end
+
+    it "returns empty string for empty input" do
+      expect(parse_json("")).to eq("")
+    end
+
+    it "returns non-string input unchanged" do
+      expect(parse_json([1, 2, 3])).to eq([1, 2, 3])
+    end
+  end
+
+  describe ".to_json_array" do
+    it "returns array unchanged" do
+      expect(to_json_array(["a", "b", "c"])).to eq(["a", "b", "c"])
+    end
+
+    it "parses JSON array string" do
+      expect(to_json_array('["a", "b", "c"]')).to eq(["a", "b", "c"])
+    end
+
+    it "splits comma-separated string" do
+      expect(to_json_array("a,b,c")).to eq(["a", "b", "c"])
+    end
+
+    it "splits with custom delimiter" do
+      expect(to_json_array("a|b|c", "|")).to eq(["a", "b", "c"])
+    end
+
+    it "trims whitespace from split values" do
+      expect(to_json_array("a , b , c")).to eq(["a", "b", "c"])
+    end
+
+    it "returns empty array for blank input" do
+      expect(to_json_array("")).to eq([])
+      expect(to_json_array(nil)).to eq([])
+    end
+
+    it "wraps hash in array" do
+      expect(to_json_array('{"key": "value"}')).to eq([{ "key" => "value" }])
+    end
+
+    it "wraps non-array/non-string in array" do
+      expect(to_json_array(123)).to eq([123])
+    end
+
+    it "handles Arabic text in JSON array" do
+      expect(to_json_array('["أول ثانوي", "ثاني ثانوي", "ثالث ثانوي"]')).to eq(["أول ثانوي", "ثاني ثانوي", "ثالث ثانوي"])
+    end
+
+    it "rejects blank values after split" do
+      expect(to_json_array("a,,b,,c")).to eq(["a", "b", "c"])
+    end
+  end
 end

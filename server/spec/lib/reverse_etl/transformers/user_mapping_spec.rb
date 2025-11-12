@@ -129,6 +129,118 @@ RSpec.describe ReverseEtl::Transformers::UserMapping do
       end
     end
 
+    context "when using template mapping with JSON arrays" do
+      let(:source_data) do
+        {
+          "levels_json" => '["أول ثانوي", "ثاني ثانوي", "ثالث ثانوي"]',
+          "levels_comma" => "Math,Science,English",
+          "tags" => '{"primary": "education", "secondary": "online"}'
+        }
+      end
+
+      context "with parse_json filter" do
+        let(:mapping) do
+          [
+            { mapping_type: "template", to: "levels_array",
+              from: "{{ levels_json | parse_json }}" }
+          ]
+        end
+
+        it "parses JSON string to array" do
+          results = extractor.transform(sync, sync_record)
+          expect(results["levels_array"]).to eq(["أول ثانوي", "ثاني ثانوي", "ثالث ثانوي"])
+        end
+      end
+
+      context "with to_json_array filter" do
+        let(:mapping) do
+          [
+            { mapping_type: "template", to: "levels_array",
+              from: "{{ levels_comma | to_json_array }}" }
+          ]
+        end
+
+        it "converts comma-separated string to array" do
+          results = extractor.transform(sync, sync_record)
+          expect(results["levels_array"]).to eq(["Math", "Science", "English"])
+        end
+      end
+
+      context "with JSON output from template" do
+        let(:mapping) do
+          [
+            { mapping_type: "template", to: "levels_array",
+              from: '["level1", "level2", "level3"]' }
+          ]
+        end
+
+        it "automatically parses JSON array output" do
+          results = extractor.transform(sync, sync_record)
+          expect(results["levels_array"]).to eq(["level1", "level2", "level3"])
+        end
+      end
+
+      context "with JSON object output from template" do
+        let(:mapping) do
+          [
+            { mapping_type: "template", to: "metadata",
+              from: '{"key": "value", "count": 5}' }
+          ]
+        end
+
+        it "automatically parses JSON object output" do
+          results = extractor.transform(sync, sync_record)
+          expect(results["metadata"]).to eq({ "key" => "value", "count" => 5 })
+        end
+      end
+
+      context "with Arabic text in JSON array" do
+        let(:mapping) do
+          [
+            { mapping_type: "template", to: "arabic_levels",
+              from: "{{ levels_json | parse_json }}" }
+          ]
+        end
+
+        it "correctly handles Arabic characters in JSON arrays" do
+          results = extractor.transform(sync, sync_record)
+          expect(results["arabic_levels"]).to eq(["أول ثانوي", "ثاني ثانوي", "ثالث ثانوي"])
+        end
+      end
+    end
+
+    context "when template output should be non-string primitives" do
+      let(:mapping) do
+        [
+          { mapping_type: "template", to: "attributes.properties.boolean_flag",
+            from: "{{ custom_boolean_field }}" },
+          { mapping_type: "template", to: "attributes.properties.float_score",
+            from: "{{ custom_float_field }}" },
+          { mapping_type: "template", to: "attributes.properties.quantity",
+            from: "{{ cr_return_quantity }}" },
+          { mapping_type: "template", to: "attributes.properties.nil_field",
+            from: "null" }
+        ]
+      end
+
+      let(:source_data) do
+        super().merge(
+          "custom_boolean_field" => "False",
+          "custom_float_field" => "19.5"
+        )
+      end
+
+      it "casts booleans, floats, integers, and null literals" do
+        results = extractor.transform(sync, sync_record)
+        properties = results.dig("attributes", "properties")
+
+        expect(properties["boolean_flag"]).to be false
+        expect(properties["float_score"]).to eq(19.5)
+        expect(properties["quantity"]).to eq(17)
+        expect(properties["nil_field"]).to be_nil
+      end
+    end
+
     context "when using vector mapping" do
       let(:mapping) do
         [

@@ -1,8 +1,13 @@
 # frozen_string_literal: true
 
+require "json"
+
 module ReverseEtl
   module Transformers
     class UserMapping < Base
+      BOOLEAN_LITERALS = { "true" => true, "false" => false }.freeze
+      NUMERIC_REGEX = /\A[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?\z/.freeze
+
       attr_accessor :mappings, :record, :destination_data
 
       def transform(sync, sync_record)
@@ -96,7 +101,62 @@ module ReverseEtl
         Liquid::Template.register_filter(Liquid::CustomFilters)
         liquid_template = Liquid::Template.parse(template)
         rendered_text = liquid_template.render(record)
-        extract_destination_mapping(dest_keys, rendered_text)
+
+        interpreted_value = normalize_template_output(rendered_text)
+        extract_destination_mapping(dest_keys, interpreted_value)
+      end
+
+      def normalize_template_output(value)
+        return value unless value.is_a?(String)
+
+        stripped_value = value.strip
+        return value if stripped_value.empty?
+
+        json_value = parse_json_container(stripped_value)
+        return json_value unless json_value.nil?
+
+        quoted_value = parse_quoted_json_string(stripped_value)
+        return quoted_value unless quoted_value.nil?
+
+        boolean_literal = parse_boolean_literal(stripped_value)
+        return boolean_literal unless boolean_literal.nil?
+
+        return nil if null_literal?(stripped_value)
+
+        numeric_literal = parse_numeric_literal(stripped_value)
+        return numeric_literal unless numeric_literal.nil?
+
+        value
+      end
+
+      def parse_json_container(value)
+        return unless value.start_with?("{", "[")
+
+        JSON.parse(value)
+      rescue JSON::ParserError
+        nil
+      end
+
+      def parse_quoted_json_string(value)
+        return unless value.start_with?('"') && value.end_with?('"')
+
+        JSON.parse(value)
+      rescue JSON::ParserError
+        nil
+      end
+
+      def parse_boolean_literal(value)
+        BOOLEAN_LITERALS[value.downcase]
+      end
+
+      def null_literal?(value)
+        value.casecmp?("null")
+      end
+
+      def parse_numeric_literal(value)
+        return unless value.match?(NUMERIC_REGEX)
+
+        value.match?(/[eE.]/) ? value.to_f : value.to_i
       end
 
       def extract_destination_mapping(dest_keys, mapped_destination_value)
