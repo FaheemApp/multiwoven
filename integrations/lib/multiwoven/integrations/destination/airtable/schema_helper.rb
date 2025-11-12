@@ -9,10 +9,6 @@ module Multiwoven
 
           module_function
 
-          def clean_name(name_str)
-            name_str.strip.gsub(" ", "_")
-          end
-
           def get_json_schema(table)
             fields = table["fields"] || {}
             properties = fields.each_with_object({}) do |field, props|
@@ -24,7 +20,8 @@ module Multiwoven
           end
 
           def process_field(field)
-            name = clean_name(field.fetch("name", ""))
+            # Use the exact field name from Airtable - no cleaning/transformation
+            name = field.fetch("name", "").strip
             original_type = field.fetch("type", "")
             options = field.fetch("options", {})
 

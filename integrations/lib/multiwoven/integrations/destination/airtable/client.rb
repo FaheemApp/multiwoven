@@ -10,6 +10,7 @@ module Multiwoven
         class Client < DestinationConnector
           prepend Multiwoven::Integrations::Core::RateLimiter
           MAX_CHUNK_SIZE = 10
+
           def check_connection(connection_config)
             connection_config = connection_config.with_indifferent_access
             bases = Multiwoven::Integrations::Core::HttpClient.request(
@@ -149,7 +150,7 @@ module Multiwoven
 
           def create_stream(table, base_id, base_name)
             {
-              name: "#{base_name}/#{SchemaHelper.clean_name(table["name"])}",
+              name: "#{base_name}/#{table["name"].strip}",
               action: "create",
               method: HTTP_POST,
               url: "#{AIRTABLE_URL_BASE}#{base_id}/#{table["id"]}",
